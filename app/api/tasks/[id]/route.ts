@@ -1,10 +1,9 @@
 export const runtime = 'nodejs';
-import { sql } from '@/lib/db';
+import { sql } from '@vercel/postgres';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const id = params.id;
   const b = await req.json();
-  const rows = await sql/* sql */`
+  const { rows } = await sql`
     update public.tasks set
       title      = coalesce(${b.title}, title),
       description= coalesce(${b.description}, description),
@@ -12,12 +11,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       status     = coalesce(${b.status}, status),
       progress   = coalesce(${b.progress}::int, progress),
       updated_at = now()
-    where id = ${id}
+    where id = ${params.id}
     returning *`;
   return rows.length ? Response.json(rows[0]) : new Response('not found', { status: 404 });
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  await sql/* sql */`delete from public.tasks where id = ${params.id}`;
+  await sql`delete from public.tasks where id=${params.id}`;
   return new Response('ok');
 }
