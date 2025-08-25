@@ -90,9 +90,9 @@ if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
             select id, title, status, due_at, progress
             from public.tasks
             where group_id=${groupId}
-              and due_at::date = (now())::date
-            order by coalesce(due_at, now()+interval '10 years') asc
-            limit 50`
+              and date(timezone('Asia/Bangkok', due_at)) = date(timezone('Asia/Bangkok', now()))
+  order by coalesce(due_at, now()+interval '10 years') asc
+  limit 50`;
         : await sql/* sql */`
             select id, title, status, due_at, progress
             from public.tasks
@@ -147,13 +147,15 @@ if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
 
 // ---------- utils ----------
 function fmtDate(d: string | Date) {
-  const dt = new Date(d);
-  const y = dt.getUTCFullYear();
-  const m = (dt.getUTCMonth() + 1).toString().padStart(2, "0");
-  const day = dt.getUTCDate().toString().padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const dt = typeof d === "string" ? new Date(d) : d;
+  // en-CA หรือ sv-SE ให้รูปแบบ YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(dt);
 }
-
 function helpText() {
   return [
     "🧭 คำสั่งที่ใช้ได้:",
