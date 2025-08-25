@@ -144,21 +144,24 @@ export default function LiffAdminPage() {
   const keyFromISO = (iso: string) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 
-  const mapByDate = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    for (const t of items) {
-      if (!t.due_at) continue;
-      const k = keyFromISO(t.due_at);
-      if (!map.has(k)) map.set(k, []);
-      map.get(k)!.push(t);
-    }
-    // เรียงในแต่ละวัน: ใกล้ครบกำหนด/สถานะ/ชื่อ
-    for (const [k, arr] of map) {
-      arr.sort((a, b) => (a.status > b.status ? 1 : -1) || a.title.localeCompare(b.title));
-      map.set(k, arr);
-    }
-    return map;
-  }, [items]);
+const mapByDate = useMemo(() => {
+  const map = new Map<string, Task[]>();
+  for (const t of items) {
+    if (!t.due_at) continue;
+    const k = keyFromISO(t.due_at);
+    const arr = map.get(k) ?? [];
+    arr.push(t);
+    map.set(k, arr);
+  }
+
+  // เรียงในแต่ละวัน: สถานะ/ชื่อ (ไม่ใช้ for..of บน Map)
+  map.forEach((arr, k) => {
+    arr.sort((a, b) => (a.status > b.status ? 1 : -1) || a.title.localeCompare(b.title));
+    map.set(k, arr);
+  });
+
+  return map;
+}, [items]);
 
   const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(firstOfMonth);
   const todayKey = keyFromDate(new Date());
