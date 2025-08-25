@@ -28,11 +28,10 @@ export default function LiffAdminPage() {
   const [draft, setDraft] = useState<Record<string, Partial<Task>>>({});
   const [creating, setCreating] = useState<Partial<Task>>({ title: "", due_at: null, description: "" });
 
-  // โหมดแก้ไขค่า (เริ่มต้นล็อกไว้)
   const [editGid, setEditGid] = useState(false);
   const [editKey, setEditKey] = useState(false);
 
-  // init: โหลดจาก localStorage ถ้ามี, ถ้าไม่มีก็รับจาก URL, ถ้ายังไม่มีอีก ลองอ่านจาก LIFF context
+  // ========= init: URL -> localStorage -> LIFF context =========
   useEffect(() => {
     (async () => {
       const url = new URL(window.location.href);
@@ -59,13 +58,12 @@ export default function LiffAdminPage() {
               localStorage.setItem(LS_GID, ctx.groupId);
             }
           }
-        } catch { /* เปิดนอก LINE ไม่มี liff ก็ข้าม */ }
+        } catch {}
       }
       setReady(true);
     })();
   }, []);
 
-  // โหลดรายการ
   const load = async () => {
     if (!groupId || !adminKey) return;
     const r = await fetch(`/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&q=${encodeURIComponent(q)}&key=${encodeURIComponent(adminKey)}`);
@@ -74,12 +72,9 @@ export default function LiffAdminPage() {
   };
   useEffect(() => { if (ready && groupId && adminKey) load(); /* eslint-disable-next-line */ }, [ready, groupId, adminKey]);
 
-  // helper
   const change = (id: string, patch: Partial<Task>) =>
     setDraft(d => ({ ...d, [id]: { ...d[id], ...patch } }));
-  const fmtDate = (iso: string | null) => iso ? new Date(iso).toISOString().slice(0,10) : "";
 
-  // actions
   const saveRow = async (id: string) => {
     if (!draft[id]) return;
     const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
@@ -103,10 +98,9 @@ export default function LiffAdminPage() {
     if (r.ok) { setCreating({ title: "", due_at: null, description: "" }); load(); } else alert(await r.text());
   };
 
-  // เปลี่ยน/บันทึกค่า Group ID & Admin Key แบบ override โดยผู้ใช้
+  const fmtDate = (iso: string | null) => iso ? new Date(iso).toISOString().slice(0,10) : "";
   const saveGid = () => { localStorage.setItem(LS_GID, groupId); setEditGid(false); load(); };
   const saveKey = () => { localStorage.setItem(LS_KEY, adminKey); setEditKey(false); load(); };
-
   const copyLink = () => {
     const u = new URL(location.href);
     u.searchParams.set("key", adminKey || "");
@@ -116,64 +110,121 @@ export default function LiffAdminPage() {
   };
 
   return (
-    <div className="p-4 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
-      <h1 className="text-xl font-semibold mb-4">LIFF Admin — Tasks</h1>
+      <h1 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6">LIFF Admin — Tasks</h1>
 
-      <div className="flex flex-wrap gap-2 items-end mb-4">
+      {/* ===== Toolbar (responsive, touch-friendly) ===== */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
         <div className="flex flex-col">
-          <label className="text-sm">Group ID</label>
+          <label className="text-sm mb-1">Group ID</label>
           <div className="flex gap-2">
             <input
-              className="border px-2 py-1 w-[360px] disabled:bg-gray-100"
+              className="border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100"
               value={groupId}
               disabled={!editGid}
               onChange={e=>setGroupId(e.target.value)}
             />
             {!editGid
-              ? <button className="px-3 py-2 rounded border" onClick={()=>setEditGid(true)}>เปลี่ยน</button>
-              : <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={saveGid}>บันทึก</button>}
+              ? <button className="px-3 py-3 md:py-2 rounded border" onClick={()=>setEditGid(true)}>เปลี่ยน</button>
+              : <button className="px-3 py-3 md:py-2 rounded bg-blue-600 text-white" onClick={saveGid}>บันทึก</button>}
           </div>
         </div>
 
         <div className="flex flex-col">
-          <label className="text-sm">Admin Key</label>
+          <label className="text-sm mb-1">Admin Key</label>
           <div className="flex gap-2">
             <input
-              className="border px-2 py-1 w-[260px] disabled:bg-gray-100"
+              className="border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100"
               value={adminKey}
               disabled={!editKey}
               onChange={e=>setAdminKey(e.target.value)}
             />
             {!editKey
-              ? <button className="px-3 py-2 rounded border" onClick={()=>setEditKey(true)}>เปลี่ยน</button>
-              : <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={saveKey}>บันทึก</button>}
+              ? <button className="px-3 py-3 md:py-2 rounded border" onClick={()=>setEditKey(true)}>เปลี่ยน</button>
+              : <button className="px-3 py-3 md:py-2 rounded bg-blue-600 text-white" onClick={saveKey}>บันทึก</button>}
           </div>
         </div>
 
         <div className="flex flex-col">
-          <label className="text-sm">ค้นหา</label>
+          <label className="text-sm mb-1">ค้นหา</label>
           <div className="flex gap-2">
-            <input className="border px-2 py-1 w-[200px]" value={q} onChange={e=>setQ(e.target.value)} />
-            <button className="bg-black text-white px-3 py-2 rounded" onClick={load}>Reload</button>
-            <button className="bg-gray-700 text-white px-3 py-2 rounded" onClick={copyLink}>Copy link</button>
+            <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
+            <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>Reload</button>
+            <button className="bg-gray-700 text-white px-3 py-3 md:py-2 rounded" onClick={copyLink}>Copy</button>
           </div>
         </div>
       </div>
 
-      {/* create row */}
-      <div className="mb-3 grid grid-cols-12 gap-2 items-center">
-        <input className="col-span-4 border px-2 py-1" placeholder="ชื่องานใหม่"
+      {/* ===== Create row (stack on mobile) ===== */}
+      <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
+        <input className="md:col-span-4 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
                value={creating.title ?? ""} onChange={e=>setCreating(c=>({...c, title:e.target.value}))}/>
-        <input className="col-span-3 border px-2 py-1" placeholder="รายละเอียด"
+        <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="รายละเอียด"
                value={creating.description ?? ""} onChange={e=>setCreating(c=>({...c, description:e.target.value}))}/>
-        <input className="col-span-2 border px-2 py-1" type="date"
+        <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" type="date"
                value={creating.due_at ? fmtDate(creating.due_at) : ""}
                onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}/>
-        <button className="col-span-2 bg-green-600 text-white px-3 py-2 rounded" onClick={createRow}>+ Add</button>
+        <button className="md:col-span-2 bg-green-600 text-white px-4 py-3 md:py-2 rounded" onClick={createRow}>+ Add</button>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* ===== Mobile: Cards ===== */}
+      <div className="space-y-3 md:hidden">
+        {items.map(t => {
+          const d = draft[t.id] || {};
+          const curProgress = d.progress ?? t.progress;
+          const curStatus = (d.status ?? t.status) as Task["status"];
+          return (
+            <div key={t.id} className="rounded-2xl border shadow-sm p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{t.code}</span>
+                <div className="flex gap-2">
+                  <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={()=>saveRow(t.id)}>Save</button>
+                  <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={()=>delRow(t.id)}>Del</button>
+                </div>
+              </div>
+
+              <label className="text-xs text-gray-600">Title</label>
+              <input className="border rounded w-full px-3 py-2 mb-2"
+                     defaultValue={t.title}
+                     onChange={e=>change(t.id,{ title:e.target.value })}/>
+
+              <label className="text-xs text-gray-600">Desc</label>
+              <textarea className="border rounded w-full px-3 py-2 mb-2"
+                        rows={2}
+                        defaultValue={t.description ?? ""}
+                        onChange={e=>change(t.id,{ description:e.target.value })}/>
+
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <label className="text-xs text-gray-600">Due</label>
+                  <input className="border rounded w-full px-3 py-2" type="date"
+                         defaultValue={fmtDate(t.due_at)}
+                         onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Status</label>
+                  <select className="border rounded w-full px-3 py-2"
+                          value={curStatus}
+                          onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
+                    {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <label className="text-xs text-gray-600">Progress: {curProgress}%</label>
+              <input className="w-full"
+                     type="range" min={0} max={100}
+                     value={curProgress}
+                     onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
+            </div>
+          );
+        })}
+        {!items.length && <div className="text-center text-gray-500 py-8">No tasks</div>}
+      </div>
+
+      {/* ===== Desktop: Table ===== */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="w-full border text-sm">
           <thead className="bg-gray-100">
             <tr>
@@ -193,31 +244,35 @@ export default function LiffAdminPage() {
                 <tr key={t.id} className="border-t">
                   <td className="p-2 font-mono">{t.code}</td>
                   <td className="p-2">
-                    <input className="border px-2 py-1 w-full" defaultValue={t.title}
+                    <input className="border px-2 py-2 w-full rounded"
+                           defaultValue={t.title}
                            onChange={e=>change(t.id,{ title:e.target.value })}/>
                   </td>
                   <td className="p-2">
-                    <input className="border px-2 py-1 w-full" defaultValue={t.description ?? ""}
+                    <input className="border px-2 py-2 w-full rounded"
+                           defaultValue={t.description ?? ""}
                            onChange={e=>change(t.id,{ description:e.target.value })}/>
                   </td>
                   <td className="p-2 text-center">
-                    <input className="border px-2 py-1" type="date" defaultValue={fmtDate(t.due_at)}
+                    <input className="border px-2 py-2 rounded" type="date"
+                           defaultValue={fmtDate(t.due_at)}
                            onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
                   </td>
                   <td className="p-2 text-center">
-                    <select className="border px-2 py-1" defaultValue={t.status}
+                    <select className="border px-2 py-2 rounded"
+                            defaultValue={t.status}
                             onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
                       {STATUS.map(s=> <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
                   <td className="p-2 text-center">
-                    <input className="border px-2 py-1 w-16 text-center" type="number" min={0} max={100}
+                    <input className="border px-2 py-2 w-20 text-center rounded" type="number" min={0} max={100}
                            defaultValue={t.progress}
                            onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
                   </td>
                   <td className="p-2 text-center">
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded mr-2" onClick={()=>saveRow(t.id)}>Save</button>
-                    <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>delRow(t.id)}>Del</button>
+                    <button className="px-3 py-2 bg-blue-600 text-white rounded mr-2" onClick={()=>saveRow(t.id)}>Save</button>
+                    <button className="px-3 py-2 bg-red-600 text-white rounded" onClick={()=>delRow(t.id)}>Del</button>
                   </td>
                 </tr>
               );
