@@ -1,5 +1,5 @@
 export const runtime = "nodejs";
-import { sql } from "../../../../lib/db";
+import { sql } from "../../../../../lib/db";
 
 function ok(req: Request) {
   const url = new URL(req.url);
