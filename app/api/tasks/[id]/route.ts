@@ -1,9 +1,8 @@
 export const runtime = 'nodejs';
 import { sql } from '../../../../lib/db';
 
-// ใช้ context:any แทนการกำหนด type เคร่ง เพื่อหลบ error "invalid DELETE export"
-export async function PATCH(req: Request, context: any) {
-  const { id } = context.params as { id: string };
+export async function PATCH(req: Request, { params }: any) {
+  const id = params.id;
   const b = await req.json();
 
   const rows = await sql/* sql */`
@@ -15,12 +14,12 @@ export async function PATCH(req: Request, context: any) {
       progress    = coalesce(${b.progress}::int, progress),
       updated_at  = now()
     where id = ${id}
-    returning *`;
+    returning id, code, title, description, due_at, status, progress, group_id, created_at, updated_at`;
+
   return rows.length ? Response.json(rows[0]) : new Response('not found', { status: 404 });
 }
 
-export async function DELETE(_req: Request, context: any) {
-  const { id } = context.params as { id: string };
-  await sql/* sql */`delete from public.tasks where id = ${id}`;
+export async function DELETE(_req: Request, { params }: any) {
+  await sql/* sql */`delete from public.tasks where id = ${params.id}`;
   return new Response('ok');
 }
