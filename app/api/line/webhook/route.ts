@@ -132,6 +132,62 @@ export async function POST(req: Request) {
       continue;
     }
 
+if (text.toLowerCase().startsWith("progress ") || text.toLowerCase().startsWith("update ")
+    || text.startsWith("เปอร์เซ็นต์ ")) {
+  try {
+    const parts = text.trim().split(/\s+/);           // ["progress","5532","+20"]
+    const key   = parts[1];                            // code 4 หลัก หรือ UUID
+    let val     = (parts[2] || "").replace(/%$/, "");  // ตัด % ท้ายถ้ามี เช่น "50%"
+
+    if (!key || !val) {
+      await reply(ev.replyToken, { type: "text",
+        text: "ตัวอย่าง:\nprogress 1234 50\nprogress 1234 +10\nprogress 1234 -5" });
+      continue;
+    }
+
+    const found = await sql/* sql */`
+      select id, code, progress, status
+      from public.tasks
+      where group_id=${groupId} and (code=${key} or id::text=${key})
+      limit 1`;
+    if (!found.length) {
+      await reply(ev.replyToken, { type: "text", text: "ไม่พบน้ำงานที่ระบุ (ตรวจสอบ code อีกครั้ง)" });
+      continue;
+    }
+    const t   = found[0];
+    const cur = Number(t.progress ?? 0);
+
+    // รองรับค่ารูปแบบ "+10" "-5" หรือ "50"
+    const isDelta = /^[+-]/.test(val);
+    const n       = parseInt(val, 10);
+    let next      = isDelta ? cur + n : n;
+    if (Number.isNaN(next)) next = cur;
+    next = Math.max(0, Math.min(100, next)); // 0..100
+
+    const nextStatus =
+      next >= 100 ? 'done'
+      : (t.status === 'todo' && next > 0 ? 'in_progress' : t.status);
+
+    await sql/* sql */`
+      update public.tasks
+      set progress=${next}, status=${nextStatus}, updated_at=now()
+      where id=${t.id}`;
+
+    // บันทึกประวัติ (actor_id เป็น null ได้)
+    await sql/* sql */`
+      insert into public.task_updates (task_id, actor_id, note, progress, new_status)
+      values (${t.id}, ${ev.source.userId ?? null}, 'progress update via chat', ${next}, ${nextStatus})`;
+
+    await reply(ev.replyToken, {
+      type: "text",
+      text: `อัปเดตความคืบหน้า [${t.code}] ${cur}% → ${next}%${next===100 ? " ✅ (done)" : ""}`
+    });
+  } catch (e:any) {
+    console.error("PROGRESS_ERR", e);
+    await reply(ev.replyToken, { type: "text", text: "อัปเดตเปอร์เซ็นต์ไม่สำเร็จ" });
+  }
+  continue;
+}
     // ---- done <code> (also accepts UUID) ----
     if (/^done\s+/i.test(text) || /^เสร็จ\s+/i.test(text)) {
       const key = text.replace(/^(done|เสร็จ)\s+/i, "").trim();
