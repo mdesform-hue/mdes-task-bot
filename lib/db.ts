@@ -1,7 +1,6 @@
 import 'server-only';
 import { neon } from '@neondatabase/serverless';
 export const sql = neon(process.env.DATABASE_URL!);
-import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import {
   pgTable,
