@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Script from "next/script";
 
 type Task = {
@@ -18,6 +18,7 @@ type Task = {
 const STATUS = ["todo", "in_progress", "blocked", "done", "cancelled"] as const;
 const LS_GID = "taskbot_gid";
 const LS_KEY = "taskbot_key";
+const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]; // เริ่ม จันทร์
 
 export default function LiffAdminPage() {
   const [ready, setReady] = useState(false);
@@ -30,6 +31,13 @@ export default function LiffAdminPage() {
 
   const [editGid, setEditGid] = useState(false);
   const [editKey, setEditKey] = useState(false);
+
+  // ====== Calendar state ======
+  const [monthCursor, setMonthCursor] = useState(() => {
+    // ตั้งต้นเดือนปัจจุบัน (เวลาไทย)
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
 
   // ========= init: URL -> localStorage -> LIFF context =========
   useEffect(() => {
@@ -98,7 +106,10 @@ export default function LiffAdminPage() {
     if (r.ok) { setCreating({ title: "", due_at: null, description: "" }); load(); } else alert(await r.text());
   };
 
-  const fmtDate = (iso: string | null) => iso ? new Date(iso).toISOString().slice(0,10) : "";
+  const fmtDate = (iso: string | null) => iso ? new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date(iso)) : "";
+
   const saveGid = () => { localStorage.setItem(LS_GID, groupId); setEditGid(false); load(); };
   const saveKey = () => { localStorage.setItem(LS_KEY, adminKey); setEditKey(false); load(); };
   const copyLink = () => {
@@ -109,12 +120,55 @@ export default function LiffAdminPage() {
     alert("คัดลอกลิงก์แล้ว");
   };
 
+  // ====== Helpers (Calendar) ======
+  const y = monthCursor.getFullYear();
+  const m = monthCursor.getMonth(); // 0..11
+  const firstOfMonth = new Date(y, m, 1);
+  const lastOfMonth = new Date(y, m + 1, 0);
+
+  // offset ให้สัปดาห์เริ่ม "จันทร์" (Mon=0, ..., Sun=6)
+  const offsetMon = (firstOfMonth.getDay() + 6) % 7; // JS: Sun=0
+  const gridStart = new Date(y, m, 1 - offsetMon);
+
+  const daysGrid: Date[] = useMemo(() => {
+    const arr: Date[] = [];
+    for (let i = 0; i < 42; i++) {
+      arr.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
+    }
+    return arr;
+  }, [gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate()]);
+
+  const keyFromDate = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+
+  const keyFromISO = (iso: string) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+
+  const mapByDate = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of items) {
+      if (!t.due_at) continue;
+      const k = keyFromISO(t.due_at);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(t);
+    }
+    // เรียงในแต่ละวัน: ใกล้ครบกำหนด/สถานะ/ชื่อ
+    for (const [k, arr] of map) {
+      arr.sort((a, b) => (a.status > b.status ? 1 : -1) || a.title.localeCompare(b.title));
+      map.set(k, arr);
+    }
+    return map;
+  }, [items]);
+
+  const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(firstOfMonth);
+  const todayKey = keyFromDate(new Date());
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
       <h1 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6">LIFF Admin — Tasks</h1>
 
-      {/* ===== Toolbar (responsive, touch-friendly) ===== */}
+      {/* ===== Toolbar ===== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
         <div className="flex flex-col">
           <label className="text-sm mb-1">Group ID</label>
@@ -156,7 +210,7 @@ export default function LiffAdminPage() {
         </div>
       </div>
 
-      {/* ===== Create row (stack on mobile) ===== */}
+      {/* ===== Create row ===== */}
       <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
         <input className="md:col-span-4 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
                value={creating.title ?? ""} onChange={e=>setCreating(c=>({...c, title:e.target.value}))}/>
@@ -174,52 +228,51 @@ export default function LiffAdminPage() {
           const d = draft[t.id] || {};
           const curProgress = d.progress ?? t.progress;
           const curStatus = (d.status ?? t.status) as Task["status"];
-          return (
-            <div key={t.id} className="rounded-2xl border shadow-sm p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{t.code}</span>
-                <div className="flex gap-2">
-                  <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={()=>saveRow(t.id)}>Save</button>
-                  <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={()=>delRow(t.id)}>Del</button>
-                </div>
+        return (
+          <div key={t.id} className="rounded-2xl border shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{t.code}</span>
+              <div className="flex gap-2">
+                <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={()=>saveRow(t.id)}>Save</button>
+                <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={()=>delRow(t.id)}>Del</button>
               </div>
-
-              <label className="text-xs text-gray-600">Title</label>
-              <input className="border rounded w-full px-3 py-2 mb-2"
-                     defaultValue={t.title}
-                     onChange={e=>change(t.id,{ title:e.target.value })}/>
-
-              <label className="text-xs text-gray-600">Desc</label>
-              <textarea className="border rounded w-full px-3 py-2 mb-2"
-                        rows={2}
-                        defaultValue={t.description ?? ""}
-                        onChange={e=>change(t.id,{ description:e.target.value })}/>
-
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <label className="text-xs text-gray-600">Due</label>
-                  <input className="border rounded w-full px-3 py-2" type="date"
-                         defaultValue={fmtDate(t.due_at)}
-                         onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-600">Status</label>
-                  <select className="border rounded w-full px-3 py-2"
-                          value={curStatus}
-                          onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
-                    {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <label className="text-xs text-gray-600">Progress: {curProgress}%</label>
-              <input className="w-full"
-                     type="range" min={0} max={100}
-                     value={curProgress}
-                     onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
             </div>
-          );
-        })}
+
+            <label className="text-xs text-gray-600">Title</label>
+            <input className="border rounded w-full px-3 py-2 mb-2"
+                   defaultValue={t.title}
+                   onChange={e=>change(t.id,{ title:e.target.value })}/>
+
+            <label className="text-xs text-gray-600">Desc</label>
+            <textarea className="border rounded w-full px-3 py-2 mb-2"
+                      rows={2}
+                      defaultValue={t.description ?? ""}
+                      onChange={e=>change(t.id,{ description:e.target.value })}/>
+
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="text-xs text-gray-600">Due</label>
+                <input className="border rounded w-full px-3 py-2" type="date"
+                       defaultValue={fmtDate(t.due_at)}
+                       onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Status</label>
+                <select className="border rounded w-full px-3 py-2"
+                        value={curStatus}
+                        onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
+                  {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <label className="text-xs text-gray-600">Progress: {curProgress}%</label>
+            <input className="w-full"
+                   type="range" min={0} max={100}
+                   value={curProgress}
+                   onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
+          </div>
+        );})}
         {!items.length && <div className="text-center text-gray-500 py-8">No tasks</div>}
       </div>
 
@@ -282,6 +335,96 @@ export default function LiffAdminPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* ===== Calendar (Monthly) ===== */}
+      <div className="mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <button
+              className="px-3 py-2 rounded border"
+              onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+            >
+              ← เดือนก่อน
+            </button>
+            <div className="text-lg font-semibold">{monthLabel}</div>
+            <button
+              className="px-3 py-2 rounded border"
+              onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            >
+              เดือนถัดไป →
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              className="border rounded px-2 py-2"
+              value={`${y}-${String(m + 1).padStart(2, "0")}`}
+              onChange={(e) => {
+                const [yy, mm] = e.target.value.split("-").map(Number);
+                if (yy && mm) setMonthCursor(new Date(yy, mm - 1, 1));
+              }}
+            />
+            <button
+              className="px-3 py-2 rounded border"
+              onClick={() => setMonthCursor(new Date())}
+            >
+              วันนี้
+            </button>
+          </div>
+        </div>
+
+        {/* weekday header (Mon..Sun) */}
+        <div className="grid grid-cols-7 text-center text-xs text-gray-600 mb-1">
+          {WEEKDAY_TH.map((d) => (
+            <div key={d} className="py-2">{d}</div>
+          ))}
+        </div>
+
+        {/* 6-week grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {daysGrid.map((d) => {
+            const k = keyFromDate(d);
+            const inMonth = d.getMonth() === m;
+            const isToday = k === todayKey;
+            const dayTasks = mapByDate.get(k) ?? [];
+
+            return (
+              <div
+                key={k}
+                className={[
+                  "min-h-[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
+                  inMonth ? "bg-white" : "bg-gray-50 text-gray-400",
+                  isToday ? "ring-2 ring-blue-500" : ""
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className={"text-xs " + (isToday ? "font-bold text-blue-600" : "")}>
+                    {d.getDate()}
+                  </span>
+                  {dayTasks.length > 0 && (
+                    <span className="text-[10px] text-gray-500">{dayTasks.length} งาน</span>
+                  )}
+                </div>
+
+                <div className="space-y-1 overflow-y-auto">
+                  {dayTasks.slice(0, 4).map(t => (
+                    <div key={t.id} className="text-[11px] md:text-xs px-1 py-0.5 rounded bg-blue-50 border border-blue-100">
+                      <span className="font-mono">{t.code}</span> — {t.title}
+                    </div>
+                  ))}
+                  {dayTasks.length > 4 && (
+                    <div className="text-[11px] text-gray-500">+{dayTasks.length - 4} more…</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 text-xs text-gray-500">
+          แสดงงานตาม <b>due date</b> (เวลาไทย). งานที่ไม่มี due date จะไม่แสดงในปฏิทิน
+        </div>
       </div>
     </div>
   );
