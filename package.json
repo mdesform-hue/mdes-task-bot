@@ -6,7 +6,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@vercel/postgres": "^0.8.0"
+    "@vercel/postgres": "^0.8.0",
     "@neondatabase/serverless": "^0.9.5",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
