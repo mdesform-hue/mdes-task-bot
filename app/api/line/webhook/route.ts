@@ -32,38 +32,46 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // add <title> | desc=ข้อความ | due=YYYY-MM-DD
-    // ตัวอย่าง: add ทำสไลด์ | desc=งานประชุม | due=2025-09-01
-    if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
-      const m = text
-        .replace(/^(add|เพิ่ม)\s+/i, "")
-        .match(/^(.*?)(?:\s*\|\s*desc=(.*?))?(?:\s*\|\s*due=(\d{4}-\d{2}-\d{2}))?\s*$/);
+// add <title> | desc=ข้อความ | due=YYYY-MM-DD
+if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
+  try {
+    const m = text
+      .replace(/^(add|เพิ่ม)\s+/i, "")
+      .match(/^(.*?)(?:\s*\|\s*desc=(.*?))?(?:\s*\|\s*due=(\d{4}-\d{2}-\d{2}))?\s*$/);
 
-      if (!m) {
-        await reply(ev.replyToken, { type: "text", text: "รูปแบบไม่ถูกต้อง\nตัวอย่าง:\nadd ชื่องาน | desc=รายละเอียด | due=2025-09-01" });
-        continue;
-      }
-      const title = (m[1] || "").trim();
-      const desc  = m[2]?.trim() || null;
-      const due   = m[3]?.trim() || null;
-
-      if (!title) {
-        await reply(ev.replyToken, { type: "text", text: "กรุณาระบุชื่อเรื่องงาน เช่น:\nadd เตรียมเอกสาร | desc=สำหรับประชุม | due=2025-09-01" });
-        continue;
-      }
-
-      const rows = await sql/* sql */`
-        insert into public.tasks (group_id, title, description, due_at)
-        values (${groupId}, ${title}, ${desc}, ${due})
-        returning id, title, due_at`;
-      const r = rows[0];
-
-      await reply(ev.replyToken, {
-        type: "text",
-        text: `🆕 เพิ่มงานแล้ว\n• ID: ${r.id}\n• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}`
-      });
-      continue;
+    if (!m) {
+      await reply(ev.replyToken, { type: "text", text: "รูปแบบไม่ถูกต้อง\nตัวอย่าง:\nadd ชื่องาน | desc=รายละเอียด | due=2025-09-01" });
+      return;
     }
+
+    const title = (m[1] || "").trim();
+    const desc  = m[2]?.trim() || null;
+    const due   = m[3]?.trim() || null;
+
+    if (!title) {
+      await reply(ev.replyToken, { type: "text", text: "กรุณาระบุชื่อเรื่องงาน เช่น:\nadd เตรียมเอกสาร | desc=สำหรับประชุม | due=2025-09-01" });
+      return;
+    }
+
+    // แปลง due เป็น ISO โดยยึดเวลาไทย 00:00
+    const dueIso = due ? new Date(`${due}T00:00:00+07:00`).toISOString() : null;
+
+    const rows = await sql/* sql */`
+      insert into public.tasks (group_id, title, description, due_at)
+      values (${groupId}, ${title}, ${desc}, ${dueIso})
+      returning id, title, due_at`;
+
+    const r = rows[0];
+    await reply(ev.replyToken, {
+      type: "text",
+      text: `🆕 เพิ่มงานแล้ว\n• ID: ${r.id}\n• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}`
+    });
+  } catch (e: any) {
+    console.error("ADD_ERR", e);
+    await reply(ev.replyToken, { type: "text", text: "เพิ่มงานไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูรูปแบบคำสั่ง" });
+  }
+  return;
+}
 
     // list (ทั้งหมด) หรือ list today
     if (/^list(\s+today)?$/i.test(text) || /^รายการ/i.test(text)) {
