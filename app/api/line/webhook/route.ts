@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     // ---- help ----
     if (/^(help|ช่วยเหลือ)$/i.test(text)) {
-      await reply(ev.replyToken, { type: "text", text: helpText() });
+      await reply(ev.replyToken, { type: "text", text: helpText(groupId) });
       continue;
     }
 
@@ -240,16 +240,20 @@ function fmtDate(d: string | Date) {
   }).format(dt);
 }
 
-function helpText() {
-  return [
-   "🧭 คำสั่งที่ใช้ได้:",
+function helpText(gid?: string) {
+  const lines = [
+    "🧭 คำสั่งที่ใช้ได้:",
     "• add ชื่องาน | desc=รายละเอียด | due=YYYY-MM-DD",
     "• list — แสดงรายการงาน (มี code 4 หลัก)",
     "• list today — แสดงงานวันนี้",
     "• progress <code> <เปอร์เซ็นต์ หรือ +10/-5> — อัปเดตความคืบหน้า",
     "• done <code> — ปิดงานโดยใช้ code 4 หลัก",
     "• help — แสดงวิธีใช้งาน",
-  ].join("\n");
+  ];
+  if (gid) {
+    lines.push("", `🆔 GROUP_ID: ${gid}`);
+  }
+  return lines.join("\n");
 }
 
 async function reply(replyToken: string, message: any) {
