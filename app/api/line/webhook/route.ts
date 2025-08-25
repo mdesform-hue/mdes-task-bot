@@ -55,30 +55,51 @@ if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
       return;
     }
 
-    // 1) ensure group exists (กัน FK error)
+    // ให้มี group ในตารางก่อน (กัน FK)
     await sql/* sql */`
       insert into public.groups(id) values (${groupId})
       on conflict (id) do nothing`;
 
-    // 2) แปลง due เป็นเวลาไทย 00:00 แล้วค่อย insert
+    // เวลาไทย 00:00
     const dueIso = due ? new Date(`${due}T00:00:00+07:00`).toISOString() : null;
 
-    const rows = await sql/* sql */`
-      insert into public.tasks (group_id, title, description, due_at)
-      values (${groupId}, ${title}, ${desc}, ${dueIso})
-      returning id, title, due_at`;
+    // gen code 4 หลัก (0000-9999) และ retry ถ้าชนภายในกลุ่ม
+    const genCode4 = () =>
+      Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+
+    let code = genCode4();
+    let rows: any[] = [];
+    for (let i = 0; i < 25; i++) {
+      try {
+        rows = await sql/* sql */`
+          insert into public.tasks (group_id, code, title, description, due_at)
+          values (${groupId}, ${code}, ${title}, ${desc}, ${dueIso})
+          returning code, title, due_at`;
+        break; // success
+      } catch (e: any) {
+        const msg = String(e?.message ?? e);
+        // unique (group_id, code) ชน → สุ่มใหม่
+        if (msg.includes("tasks_group_code_uq") || msg.includes("duplicate key value")) {
+          code = genCode4();
+          continue;
+        }
+        throw e; // error อื่น ๆ
+      }
+    }
+
+    if (!rows.length) throw new Error("Cannot allocate 4-digit code");
 
     const r = rows[0];
     await reply(ev.replyToken, {
       type: "text",
-      text: `🆕 เพิ่มงานแล้ว\n• ID: ${r.id}\n• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}`
+      text: `🆕 เพิ่มงานแล้ว
+• CODE: ${r.code}
+• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}`
     });
   } catch (e: any) {
-    console.error("ADD_ERR", e); // ดูได้ใน Vercel → Runtime Logs
-    await reply(ev.replyToken, {
-      type: "text",
-      text: "เพิ่มงานไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูรูปแบบคำสั่ง"
-    });
+    console.error("ADD_ERR", e);
+    await reply(ev.replyToken, { type: "text",
+      text: "เพิ่มงานไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูรูปแบบคำสั่ง" });
   }
   return;
 }
