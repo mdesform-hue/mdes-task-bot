@@ -174,10 +174,11 @@ function fmtDate(d: string | Date) {
 
 function helpText() {
   return [
-    "🧭 คำสั่งที่ใช้ได้:",
+   "🧭 คำสั่งที่ใช้ได้:",
     "• add ชื่องาน | desc=รายละเอียด | due=YYYY-MM-DD",
     "• list — แสดงรายการงาน (มี code 4 หลัก)",
     "• list today — แสดงงานวันนี้",
+    "• progress <code> <เปอร์เซ็นต์ หรือ +10/-5> — อัปเดตความคืบหน้า",
     "• done <code> — ปิดงานโดยใช้ code 4 หลัก",
     "• help — แสดงวิธีใช้งาน",
   ].join("\n");
