@@ -130,7 +130,7 @@ export default function LiffAdminPage() {
   const [bulkDue, setBulkDue] = useState<string>("");
   const bulkApplyStatus = async () => {
     if (!selected.size) return;
-    await Promise.all([...selected].map(id =>
+    await Promise.all(Array.from(selected).map(id =>
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: bulkStatus })
       })
@@ -139,7 +139,7 @@ export default function LiffAdminPage() {
   };
   const bulkApplyDue = async () => {
     if (!selected.size || !bulkDue) return;
-    await Promise.all([...selected].map(id =>
+    await Promise.all(Array.from(selected).map(id =>
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due_at: bulkDue })
       })
@@ -149,7 +149,7 @@ export default function LiffAdminPage() {
   const bulkDelete = async () => {
     if (!selected.size) return;
     if (!confirm(`ลบ ${selected.size} งาน?`)) return;
-    await Promise.all([...selected].map(id =>
+    await Promise.all(Array.from(selected).map(id =>
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" })
     ));
     await load();
