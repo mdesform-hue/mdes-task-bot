@@ -172,11 +172,24 @@ export default function KanbanPage() {
 
   // ===== Render =====
   return (
-    <div className="relative p-4 md:p-6 max-w-[1400px] mx-auto min-h-screen overflow-hidden">
-      {/* background modern gradient */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-sky-100 via-white to-emerald-100 dark:from-slate-900 dark:via-slate-950 dark:to-indigo-900" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-sky-200/40 via-transparent to-transparent dark:from-indigo-500/20" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-emerald-200/30 via-transparent to-transparent dark:from-pink-500/10" />
+   <div className="relative min-h-screen flex flex-col overflow-hidden">
+    {/* พื้นหลัง gradient หลัก */}
+    <div className="absolute inset-0 -z-10 bg-gradient-to-br
+                    from-sky-400 via-purple-500 to-pink-500
+                    dark:from-indigo-900 dark:via-violet-900 dark:to-fuchsia-900" />
+
+    {/* เลเยอร์รูปทรงโปร่ง + blur เพื่อเพิ่มมิติ */}
+    <div className="absolute inset-0 -z-10 pointer-events-none">
+      {/* สี่เหลี่ยมโปร่ง โทนฟ้า */}
+      <div className="absolute -top-10 -left-10 w-80 h-80 bg-white/10 rounded-3xl blur-3xl rotate-6" />
+      {/* วงกลมโปร่ง โทนม่วง */}
+      <div className="absolute top-24 right-12 w-72 h-72 bg-white/10 rounded-full blur-2xl" />
+      {/* แผ่นเฉียงโปร่ง โทนชมพู */}
+      <div className="absolute bottom-[-3rem] left-1/3 w-[28rem] h-56 bg-white/10 rounded-3xl blur-3xl -rotate-6" />
+    </div>
+
+    {/* เนื้อหาหลัก */}
+    <div className="p-4 md:p-6 max-w-[1400px] mx-auto flex-1">
 
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
