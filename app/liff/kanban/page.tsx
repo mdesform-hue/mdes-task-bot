@@ -173,21 +173,21 @@ export default function KanbanPage() {
   // ===== Render =====
   return (
  <div className="relative min-h-screen flex flex-col overflow-hidden">
-    {/* พื้นหลัง gradient หลัก */}
+    
     <div
       className="absolute inset-0 -z-10 bg-gradient-to-br
                  from-sky-400 via-purple-500 to-pink-500
                  dark:from-indigo-900 dark:via-violet-900 dark:to-fuchsia-900"
     />
 
-    {/* เลเยอร์ shape โปร่ง + blur */}
+  
     <div className="absolute inset-0 -z-10 pointer-events-none">
       <div className="absolute -top-10 -left-10 w-80 h-80 bg-white/10 rounded-3xl blur-3xl rotate-6" />
       <div className="absolute top-24 right-12 w-72 h-72 bg-white/10 rounded-full blur-2xl" />
       <div className="absolute -bottom-12 left-1/3 w-[28rem] h-56 bg-white/10 rounded-3xl blur-3xl -rotate-6" />
     </div>
 
-    {/* เนื้อหา */}
+    
     <div className="p-4 md:p-6 max-w-[1400px] mx-auto flex-1">
 
       {/* Toolbar */}
