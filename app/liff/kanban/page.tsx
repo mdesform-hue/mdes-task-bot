@@ -210,11 +210,15 @@ export default function KanbanPage() {
                   )}
                   title={`code=${t.code}`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium leading-5">{t.title}</div>
+ <div className="grid grid-cols-[1fr_auto] gap-3">
+  <div className="min-w-0">
+    <div className="text-sm font-medium leading-5 break-words line-clamp-2">
+       {t.title}
+    </div>
                       {t.description && (
-                        <div className="text-xs text-gray-600 mt-1 line-clamp-2">{t.description}</div>
+                        <div className="text-xs text-gray-600 mt-1 line-clamp-2">
+                          {t.description}
+                          </div>
                       )}
                     </div>
                     <div className="text-right shrink-0">
@@ -222,8 +226,8 @@ export default function KanbanPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between mt-2 text-xs text-gray-600">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between mt-2 text-xs text-gray-600 gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className={cx(
                         "rounded px-2 py-0.5",
                         t.priority === "urgent" && "bg-red-100 text-red-700",
@@ -233,7 +237,9 @@ export default function KanbanPage() {
                       )}>{t.priority}</span>
                       <span>{t.progress ?? 0}%</span>
                     </div>
-                    <div>{t.due_at ? `กำหนด ${fmtDate(t.due_at)}` : ""}</div>
+                    <div className="whitespace-nowrap text-right">
+                      {t.due_at ? `กำหนด ${fmtDate(t.due_at)}` : ""}
+                      </div>
                   </div>
 
                   {t.tags && t.tags.length > 0 && (
