@@ -1,3 +1,4 @@
+// app/liff/page.tsx
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import Script from "next/script";
@@ -91,8 +92,15 @@ export default function LiffAdminPage() {
   const load = async () => {
     if (!groupId || !adminKey) return;
     const r = await fetch(`/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&q=${encodeURIComponent(q)}&key=${encodeURIComponent(adminKey)}`);
+    if (!r.ok) {
+      alert(await r.text());
+      setItems([]);
+      clearSel();
+      return;
+    }
     const j = await r.json();
-    setItems(j.items ?? []);
+    // รองรับทั้งสองรูปแบบ response
+    setItems(Array.isArray(j) ? j : (j.items ?? []));
     clearSel();
   };
   useEffect(() => { if (ready && groupId && adminKey) load(); /* eslint-disable-next-line */ }, [ready, groupId, adminKey]);
@@ -473,7 +481,7 @@ export default function LiffAdminPage() {
 
             return (
               <div key={k} className={[
-                "min-h-[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
+                "min-h[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
                 inMonth ? "bg-white" : "bg-gray-50 text-gray-400",
                 isToday ? "ring-2 ring-blue-500" : ""
               ].join(" ")}>
