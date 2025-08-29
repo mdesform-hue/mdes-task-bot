@@ -48,7 +48,7 @@ export async function GET(req: Request) {
         order by coalesce(due_at, now()+interval '10 years') asc
         limit ${limit}`;
 
-  return Response.json({ items: rows });
+  return Response.json(rows);
 }
 
 export async function POST(req: Request) {
