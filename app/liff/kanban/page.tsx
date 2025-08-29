@@ -77,6 +77,10 @@ export default function KanbanPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Task[]>([]);
 
+  // Progress editor state
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [progressDraft, setProgressDraft] = useState<number>(0);
+
   // Try to hydrate defaults from localStorage
   useEffect(() => {
     try {
@@ -170,6 +174,35 @@ export default function KanbanPage() {
     }
   }
 
+  // ===== Progress Editor (Modal) =====
+  function openEditor(t: Task) {
+    setEditTask(t);
+    setProgressDraft(Math.max(0, Math.min(100, Number(t.progress ?? 0))));
+  }
+  function closeEditor() {
+    setEditTask(null);
+  }
+  async function saveProgress() {
+    if (!editTask) return;
+    const id = editTask.id;
+    const newValue = Math.max(0, Math.min(100, Number(progressDraft)));
+    try {
+      // optimistic
+      setData((prev) => prev.map((t) => (t.id === id ? { ...t, progress: newValue } : t)));
+      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ progress: newValue }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      closeEditor();
+    } catch (e) {
+      console.error(e);
+      alert("บันทึกเปอร์เซ็นต์ไม่สำเร็จ");
+      load();
+    }
+  }
+
   // ===== Render =====
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden">
@@ -249,12 +282,15 @@ export default function KanbanPage() {
                     key={t.id}
                     draggable
                     onDragStart={(e) => onDragStart(e, t.id)}
+                    onClick={() => openEditor(t)}
                     className={cx(
-                      "rounded-2xl border bg-white dark:bg-slate-900 p-3 md:p-3 shadow-sm mb-2 cursor-move hover:shadow-md transition-all",
+                      "rounded-2xl border bg-white dark:bg-slate-900 p-3 md:p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all",
                       t.status === "done" ? "opacity-80" : "",
                       "ring-1 ring-black/5 dark:ring-white/10"
                     )}
                     title={`code=${t.code}`}
+                    role="button"
+                    tabIndex={0}
                   >
                     <div className="h-1.5 -mt-3 -mx-3 md:-mx-3 rounded-t-2xl bg-gradient-to-r from-white/0 via-white/60 to-white/0 dark:via-slate-700/60" />
                     <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -307,6 +343,54 @@ export default function KanbanPage() {
           ))}
         </div>
       </div>
+
+      {/* ===== Modal: Progress Editor ===== */}
+      {editTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditor} />
+          <div className="relative w-full max-w-sm mx-4 rounded-2xl border bg-white/90 dark:bg-slate-900/90 p-4 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-sm text-slate-500">ปรับความคืบหน้า</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">{editTask.title}</div>
+                <div className="text-xs text-slate-500 mt-1">code {editTask.code}</div>
+              </div>
+              <button
+                onClick={closeEditor}
+                className="rounded-full px-2 py-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                aria-label="Close"
+              >✕</button>
+            </div>
+
+            <div className="mt-4">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={progressDraft}
+                onChange={(e) => setProgressDraft(Number(e.target.value))}
+                className="w-full accent-indigo-500"
+              />
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <div className="text-slate-600 dark:text-slate-300">{progressDraft}%</div>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={progressDraft}
+                  onChange={(e) => setProgressDraft(Math.max(0, Math.min(100, Number(e.target.value))))}
+                  className="w-20 border rounded px-2 py-1 bg-white/80 dark:bg-slate-800/80"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button onClick={closeEditor} className="px-3 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">ยกเลิก</button>
+              <button onClick={saveProgress} className="px-3 py-2 rounded bg-gradient-to-r from-indigo-600 to-sky-500 text-white">บันทึก</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
