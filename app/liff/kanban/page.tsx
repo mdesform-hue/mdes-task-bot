@@ -172,7 +172,12 @@ export default function KanbanPage() {
 
   // ===== Render =====
   return (
-    <div className="p-4 md:p-6 max-w-[1400px] mx-auto bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 min-h-screen">
+    <div className="relative p-4 md:p-6 max-w-[1400px] mx-auto min-h-screen overflow-hidden">
+      {/* background modern gradient */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-sky-100 via-white to-emerald-100 dark:from-slate-900 dark:via-slate-950 dark:to-indigo-900" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-sky-200/40 via-transparent to-transparent dark:from-indigo-500/20" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-emerald-200/30 via-transparent to-transparent dark:from-pink-500/10" />
+
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
         <div className="flex-1">
@@ -241,10 +246,7 @@ export default function KanbanPage() {
                   )}
                   title={`code=${t.code}`}
                 >
-                  {/* top accent */}
                   <div className="h-1.5 -mt-3 -mx-3 md:-mx-3 rounded-t-2xl bg-gradient-to-r from-white/0 via-white/60 to-white/0 dark:via-slate-700/60" />
-
-                  {/* title + code */}
                   <div className="grid grid-cols-[1fr_auto] gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-medium leading-5 break-words line-clamp-2 text-slate-800 dark:text-slate-100">{t.title}</div>
@@ -256,8 +258,6 @@ export default function KanbanPage() {
                       <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block text-slate-600 dark:text-slate-300">code {t.code}</div>
                     </div>
                   </div>
-
-                  {/* meta row */}
                   <div className="flex items-center justify-between mt-2 text-xs text-slate-600 dark:text-slate-400 gap-2">
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={cx("rounded-full px-2 py-0.5 border", PR_CHIP[t.priority])}>{t.priority}</span>
@@ -267,8 +267,6 @@ export default function KanbanPage() {
                       {t.due_at ? `กำหนด ${fmtDate(t.due_at)}` : ""}
                     </div>
                   </div>
-
-                  {/* progress bar */}
                   <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                     <div
                       className={cx(
@@ -282,8 +280,6 @@ export default function KanbanPage() {
                       style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }}
                     />
                   </div>
-
-                  {/* tags */}
                   {t.tags && t.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {t.tags.map((tag, i) => (
@@ -293,7 +289,6 @@ export default function KanbanPage() {
                   )}
                 </article>
               ))}
-
               {columns[s].length === 0 && (
                 <div className="text-xs text-slate-500 dark:text-slate-400 italic">(ลากการ์ดมาวางที่นี่)</div>
               )}
