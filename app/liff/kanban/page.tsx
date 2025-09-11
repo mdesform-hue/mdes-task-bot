@@ -277,6 +277,7 @@ export default function KanbanPage() {
       </div>
 
       {/* Modal Progress Editor (เหมือนเดิม) */}
+  
       {editTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditor} />
@@ -284,20 +285,40 @@ export default function KanbanPage() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-sm text-slate-500">ปรับความคืบหน้า</div>
-                <div className="font-semibold">{editTask.title}</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">{editTask.title}</div>
                 <div className="text-xs text-slate-500 mt-1">code {editTask.code}</div>
               </div>
-              <button onClick={closeEditor}>✕</button>
+              <button
+                onClick={closeEditor}
+                className="rounded-full px-2 py-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                aria-label="Close"
+              >✕</button>
             </div>
+
             <div className="mt-4">
-              <input type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))} className="w-full" />
-              <div className="mt-2 flex justify-between text-sm">
-                <div>{progressDraft}%</div>
-                <input type="number" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))} className="w-20 border rounded px-2 py-1" />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={progressDraft}
+                onChange={(e) => setProgressDraft(Number(e.target.value))}
+                className="w-full accent-indigo-500"
+              />
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <div className="text-slate-600 dark:text-slate-300">{progressDraft}%</div>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={progressDraft}
+                  onChange={(e) => setProgressDraft(Math.max(0, Math.min(100, Number(e.target.value))))}
+                  className="w-20 border rounded px-2 py-1 bg-white/80 dark:bg-slate-800/80"
+                />
               </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={closeEditor} className="px-3 py-2 rounded bg-slate-100">ยกเลิก</button>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button onClick={closeEditor} className="px-3 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">ยกเลิก</button>
               <button onClick={saveProgress} className="px-3 py-2 rounded bg-gradient-to-r from-indigo-600 to-sky-500 text-white">บันทึก</button>
             </div>
           </div>
