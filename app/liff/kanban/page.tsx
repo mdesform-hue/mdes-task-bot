@@ -47,14 +47,6 @@ const STATUS_RING: Record<Status, string> = {
   cancelled: "ring-zinc-300/50",
 };
 
-// 🆕 helper สำหรับเช็ควันครบกำหนด
-const dueClass = (due_at: string | null) => {
-  if (!due_at) return "text-gray-500";
-  const d = new Date(due_at).getTime();
-  const now = Date.now();
-  return d < now ? "text-red-600 font-semibold" : "text-green-600 font-semibold";
-};
-
 function fmtDate(v?: string | null) {
   if (!v) return "";
   try {
@@ -214,15 +206,58 @@ export default function KanbanPage() {
   // ===== Render =====
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden">
-      {/* background */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-sky-400 via-purple-500 to-pink-500 dark:from-indigo-900 dark:via-violet-900 dark:to-fuchsia-900" />
+      {/* พื้นหลัง gradient หลัก */}
+      <div
+        className="absolute inset-0 -z-10 bg-gradient-to-br
+                   from-sky-400 via-purple-500 to-pink-500
+                   dark:from-indigo-900 dark:via-violet-900 dark:to-fuchsia-900"
+      />
+      {/* shape โปร่ง + blur */}
       <div className="absolute inset-0 -z-10 pointer-events-none">
         <div className="absolute -top-10 -left-10 w-80 h-80 bg-white/10 rounded-3xl blur-3xl rotate-6" />
         <div className="absolute top-24 right-12 w-72 h-72 bg-white/10 rounded-full blur-2xl" />
         <div className="absolute -bottom-12 left-1/3 w-[28rem] h-56 bg-white/10 rounded-3xl blur-3xl -rotate-6" />
       </div>
 
+      {/* เนื้อหา */}
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto flex-1">
+        {/* Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
+          <div className="flex-1">
+            <label className="text-sm mb-1 block text-slate-600 dark:text-slate-300">Group ID</label>
+            <input
+              className="border px-3 py-2 rounded w-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              placeholder="กรอก Group ID หรือเปิดผ่าน LIFF เพื่อดึงอัตโนมัติ"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm mb-1 block text-slate-600 dark:text-slate-300">Admin Key</label>
+            <input
+              className="border px-3 py-2 rounded w-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              type="password"
+              value={adminKey}
+              onChange={(e) => setAdminKey(e.target.value)}
+              placeholder="ADMIN_KEY"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm mb-1 block text-slate-600 dark:text-slate-300">ค้นหา</label>
+            <input
+              className="border px-3 py-2 rounded w-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="คำค้น เช่น เอกสาร, @ชื่อ, tag"
+            />
+          </div>
+          <button
+            className="px-4 py-2 rounded bg-gradient-to-r from-indigo-600 to-sky-500 text-white shadow-sm hover:shadow-md active:scale-[.98] disabled:opacity-50"
+            onClick={load}
+            disabled={loading || !groupId || !adminKey}
+          >{loading ? "กำลังโหลด..." : "รีเฟรช"}</button>
+        </div>
+
         {/* Columns */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 min-h-[60vh]">
           {STATUSES.map((s) => (
@@ -248,36 +283,68 @@ export default function KanbanPage() {
                     draggable
                     onDragStart={(e) => onDragStart(e, t.id)}
                     onClick={() => openEditor(t)}
-                    className="rounded-2xl border bg-white dark:bg-slate-900 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 dark:ring-white/10"
+                    className={cx(
+                      "rounded-2xl border bg-white dark:bg-slate-900 p-3 md:p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all",
+                      t.status === "done" ? "opacity-80" : "",
+                      "ring-1 ring-black/5 dark:ring-white/10"
+                    )}
+                    title={`code=${t.code}`}
+                    role="button"
+                    tabIndex={0}
                   >
+                    <div className="h-1.5 -mt-3 -mx-3 md:-mx-3 rounded-t-2xl bg-gradient-to-r from-white/0 via-white/60 to-white/0 dark:via-slate-700/60" />
                     <div className="grid grid-cols-[1fr_auto] gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-100">{t.title}</div>
+                        <div className="text-sm font-medium leading-5 break-words line-clamp-2 text-slate-800 dark:text-slate-100">{t.title}</div>
+                        {t.description && (
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{t.description}</div>
+                        )}
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block">code {t.code}</div>
+                        <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block text-slate-600 dark:text-slate-300">code {t.code}</div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-2 text-xs gap-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between mt-2 text-xs text-slate-600 dark:text-slate-400 gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className={cx("rounded-full px-2 py-0.5 border", PR_CHIP[t.priority])}>{t.priority}</span>
                         <span>{t.progress ?? 0}%</span>
                       </div>
-                      {/* 🆕 due date สี */}
-                      <div className={cx("whitespace-nowrap", dueClass(t.due_at))}>
+                      <div className="whitespace-nowrap text-right">
                         {t.due_at ? `กำหนด ${fmtDate(t.due_at)}` : ""}
                       </div>
                     </div>
+                    <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className={cx(
+                          "h-full rounded-full bg-gradient-to-r",
+                          t.status === "done"
+                            ? "from-emerald-400 to-emerald-500"
+                            : t.status === "blocked"
+                            ? "from-rose-400 to-rose-500"
+                            : "from-indigo-400 to-sky-400"
+                        )}
+                        style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }}
+                      />
+                    </div>
+                    {t.tags && t.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {t.tags.map((tag, i) => (
+                          <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded px-2 py-0.5">#{tag}</span>
+                        ))}
+                      </div>
+                    )}
                   </article>
                 ))}
+                {columns[s].length === 0 && (
+                  <div className="text-xs text-slate-500 dark:text-slate-400 italic">(ลากการ์ดมาวางที่นี่)</div>
+                )}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Modal Progress Editor (เหมือนเดิม) */}
-  
+      {/* ===== Modal: Progress Editor ===== */}
       {editTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditor} />
