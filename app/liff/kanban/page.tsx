@@ -69,7 +69,7 @@ const PR_CHIP: Record<Task["priority"], string> = {
   low: "bg-gradient-to-r from-emerald-500/15 to-emerald-400/10 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40",
 };
 
-/** 🆕 คำนวณข้อความ “ระยะเวลา” + สี ตาม due date และสถานะ */
+/** คำนวณข้อความ “ระยะเวลา” + สี ตาม due date และสถานะ */
 function dueMeta(t: Task): { text: string; cls: string } {
   if (t.status === "done") {
     return { text: "เสร็จสิ้น", cls: "text-emerald-600 font-semibold" };
@@ -77,8 +77,6 @@ function dueMeta(t: Task): { text: string; cls: string } {
   if (!t.due_at) return { text: "", cls: "text-gray-500" };
 
   const due = new Date(t.due_at);
-
-  // normalize เทียบแบบ “วันที่” ล้วน (ไม่สนเวลา) ตามเขตเวลาเครื่อง
   const today = new Date();
   const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const startOfDue = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
@@ -86,13 +84,45 @@ function dueMeta(t: Task): { text: string; cls: string } {
   const MS = 24 * 60 * 60 * 1000;
   const diff = Math.round((startOfDue - startOfToday) / MS); // >0 = ยังเหลือ, 0 = วันนี้, <0 = เลยแล้ว
 
-  if (diff > 0) {
-    return { text: `เหลืออีก ${diff} วัน`, cls: "text-green-600 font-semibold" };
-  } else if (diff === 0) {
-    return { text: "ครบกำหนดวันนี้", cls: "text-amber-600 font-semibold" };
-  } else {
-    return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold" };
-  }
+  if (diff > 0) return { text: `เหลืออีก ${diff} วัน`, cls: "text-green-600 font-semibold" };
+  if (diff === 0) return { text: "ครบกำหนดวันนี้", cls: "text-amber-600 font-semibold" };
+  return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold" };
+}
+
+/** 🆕 สร้าง Google Calendar Template URL
+ *  - ไม่สามารถ “บังคับ” ให้ลงปฏิทินของอีเมลที่ระบุได้ถ้าไม่ทำ OAuth
+ *  - ใช้วิธีเปิดหน้าสร้างอีเวนต์พร้อมเชิญอีเมลนั้นด้วยพารามิเตอร์ add=
+ */
+function googleCalendarUrl(opts: {
+  title: string;
+  details?: string;
+  location?: string;
+  start: Date;
+  end: Date;
+  inviteEmail?: string;
+}) {
+  const fmt = (d: Date) => {
+    // YYYYMMDDTHHMMSSZ (UTC)
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const y = d.getUTCFullYear();
+    const m = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hh = pad(d.getUTCHours());
+    const mm = pad(d.getUTCMinutes());
+    const ss = pad(d.getUTCSeconds());
+    return `${y}${m}${day}T${hh}${mm}${ss}Z`;
+  };
+
+  const base = "https://calendar.google.com/calendar/render";
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: opts.title || "",
+    details: opts.details || "",
+    location: opts.location || "",
+    dates: `${fmt(opts.start)}/${fmt(opts.end)}`,
+  });
+  if (opts.inviteEmail) params.set("add", opts.inviteEmail);
+  return `${base}?${params.toString()}`;
 }
 
 // ===== Page =====
@@ -103,9 +133,18 @@ export default function KanbanPage() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Task[]>([]);
 
-  // Progress editor state
+  // Progress editor & calendar state
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [progressDraft, setProgressDraft] = useState<number>(0);
+
+  // 🆕 ฟอร์มลงตาราง
+  const [calEmail, setCalEmail] = useState("");
+  const [calTitle, setCalTitle] = useState("");
+  const [calDesc, setCalDesc] = useState("");
+  const [calLocation, setCalLocation] = useState("");
+  const [calDate, setCalDate] = useState("");      // yyyy-mm-dd
+  const [calStart, setCalStart] = useState("09:00");
+  const [calEnd, setCalEnd] = useState("10:00");
 
   // ลองดึงค่า default จาก localStorage
   useEffect(() => {
@@ -165,9 +204,7 @@ export default function KanbanPage() {
     }
   }
 
-  useEffect(() => {
-    load(); // eslint-disable-next-line
-  }, [groupId, adminKey]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [groupId, adminKey]);
 
   // ===== Drag & Drop =====
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -177,11 +214,7 @@ export default function KanbanPage() {
     e.dataTransfer.setData("text/plain", id);
     e.dataTransfer.effectAllowed = "move";
   }
-
-  function onDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
+  function onDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }
 
   async function onDrop(e: React.DragEvent, next: Status) {
     e.preventDefault();
@@ -189,7 +222,6 @@ export default function KanbanPage() {
     const id = raw || draggingId;
     if (!id) return;
     try {
-      // Optimistic UI
       setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: next } : t)));
       const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
         method: "PATCH",
@@ -206,20 +238,30 @@ export default function KanbanPage() {
     }
   }
 
-  // ===== Progress Editor (Modal) =====
+  // ===== Progress Editor (Modal) + Calendar form =====
   function openEditor(t: Task) {
     setEditTask(t);
     setProgressDraft(Math.max(0, Math.min(100, Number(t.progress ?? 0))));
+    // prefill calendar fields
+    setCalTitle(t.title || "");
+    setCalDesc(t.description || "");
+    setCalLocation("");
+    if (t.due_at) {
+      const d = new Date(t.due_at);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      setCalDate(`${yyyy}-${mm}-${dd}`);
+    } else {
+      setCalDate("");
+    }
   }
-  function closeEditor() {
-    setEditTask(null);
-  }
+  function closeEditor() { setEditTask(null); }
   async function saveProgress() {
     if (!editTask) return;
     const id = editTask.id;
     const newValue = Math.max(0, Math.min(100, Number(progressDraft)));
     try {
-      // optimistic
       setData((prev) => prev.map((t) => (t.id === id ? { ...t, progress: newValue } : t)));
       const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
         method: "PATCH",
@@ -233,6 +275,36 @@ export default function KanbanPage() {
       alert("บันทึกเปอร์เซ็นต์ไม่สำเร็จ");
       load();
     }
+  }
+
+  // 🆕 เพิ่มใน Google Calendar
+  function addToCalendar() {
+    const t = editTask;
+    if (!t) return;
+
+    if (!calDate) {
+      alert("กรุณาเลือกวันที่สำหรับลงตาราง");
+      return;
+    }
+    const [sh, sm] = calStart.split(":").map(Number);
+    const [eh, em] = calEnd.split(":").map(Number);
+    const startLocal = new Date(`${calDate}T${calStart}:00`);
+    const endLocal = new Date(`${calDate}T${calEnd}:00`);
+    if (endLocal <= startLocal) {
+      alert("เวลาเสร็จต้องหลังเวลาเริ่ม");
+      return;
+    }
+
+    const url = googleCalendarUrl({
+      title: calTitle || t.title,
+      details: calDesc || t.description || "",
+      location: calLocation || "",
+      start: startLocal,
+      end: endLocal,
+      inviteEmail: calEmail || undefined, // จะเชิญอีเมลนี้เป็นผู้เข้าร่วม
+    });
+
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   // ===== Render =====
@@ -342,18 +414,13 @@ export default function KanbanPage() {
                           <span>{t.progress ?? 0}%</span>
                         </div>
 
-                        {/* 🆕 แสดงกำหนด + ระยะเวลา */}
-                        <div className="w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[14rem] text-right">
+                        <div className="w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[16rem] text-right">
                           {t.due_at && (
                             <div className="truncate text-slate-600 dark:text-slate-300">
                               กำหนด {fmtDate(t.due_at)}
                             </div>
                           )}
-                          {meta.text && (
-                            <div className={cx("truncate", meta.cls)}>
-                              {meta.text}
-                            </div>
-                          )}
+                          {meta.text && <div className={cx("truncate", meta.cls)}>{meta.text}</div>}
                         </div>
                       </div>
 
@@ -368,9 +435,7 @@ export default function KanbanPage() {
                               ? "from-rose-400 to-rose-500"
                               : "from-indigo-400 to-sky-400"
                           )}
-                          style={{
-                            width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%`,
-                          }}
+                          style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }}
                         />
                       </div>
 
@@ -398,14 +463,14 @@ export default function KanbanPage() {
         </div>
       </div>
 
-      {/* ===== Modal: Progress Editor ===== */}
+      {/* ===== Modal: Progress Editor + Add to Calendar ===== */}
       {editTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditor} />
-          <div className="relative w-full max-w-sm mx-4 rounded-2xl border bg-white/90 dark:bg-slate-900/90 p-4 shadow-xl">
+          <div className="relative w-full max-w-lg mx-4 rounded-2xl border bg-white/90 dark:bg-slate-900/90 p-4 shadow-xl">
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-sm text-slate-500">ปรับความคืบหน้า</div>
+                <div className="text-sm text-slate-500">จัดการงาน</div>
                 <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">
                   {editTask.title}
                 </div>
@@ -420,7 +485,9 @@ export default function KanbanPage() {
               </button>
             </div>
 
+            {/* Progress */}
             <div className="mt-4">
+              <div className="text-sm font-medium mb-2">ปรับความคืบหน้า</div>
               <input
                 type="range"
                 min={0}
@@ -444,18 +511,107 @@ export default function KanbanPage() {
               </div>
             </div>
 
+            {/* 🆕 Add to Calendar */}
+            <div className="mt-6 border-t pt-4">
+              <div className="text-sm font-medium mb-2">ลงตาราง (Google Calendar)</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600">อีเมลปฏิทิน (เชิญเข้าร่วม)</label>
+                  <input
+                    className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                    placeholder="name@example.com"
+                    value={calEmail}
+                    onChange={(e) => setCalEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600">ชื่อเหตุการณ์</label>
+                  <input
+                    className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                    value={calTitle}
+                    onChange={(e) => setCalTitle(e.target.value)}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600">รายละเอียด</label>
+                  <textarea
+                    rows={2}
+                    className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                    value={calDesc}
+                    onChange={(e) => setCalDesc(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-600">วันที่</label>
+                  <input
+                    type="date"
+                    className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                    value={calDate}
+                    onChange={(e) => setCalDate(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-600">เริ่ม</label>
+                    <input
+                      type="time"
+                      className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                      value={calStart}
+                      onChange={(e) => setCalStart(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">สิ้นสุด</label>
+                    <input
+                      type="time"
+                      className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                      value={calEnd}
+                      onChange={(e) => setCalEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600">สถานที่ (ถ้ามี)</label>
+                  <input
+                    className="mt-1 w-full border rounded px-3 py-2 bg-white/80 dark:bg-slate-800/80"
+                    placeholder="ห้องประชุม / ลิงก์ประชุม ฯลฯ"
+                    value={calLocation}
+                    onChange={(e) => setCalLocation(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={addToCalendar}
+                  className="px-3 py-2 rounded bg-gradient-to-r from-emerald-600 to-teal-500 text-white"
+                >
+                  เพิ่มใน Google Calendar
+                </button>
+              </div>
+
+              <div className="mt-2 text-[11px] text-slate-500">
+                * ระบบจะเปิดหน้า Google Calendar พร้อมกรอกข้อมูลให้ และเชิญอีเมลที่ระบุเป็นผู้เข้าร่วม
+                หากต้องการให้บันทึกลง “ปฏิทินของอีเมลนั้นโดยอัตโนมัติ” ต้องทำ OAuth ฝั่งเซิร์ฟเวอร์เพิ่มเติม
+              </div>
+            </div>
+
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
                 onClick={closeEditor}
                 className="px-3 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
               >
-                ยกเลิก
+                ปิด
               </button>
               <button
                 onClick={saveProgress}
                 className="px-3 py-2 rounded bg-gradient-to-r from-indigo-600 to-sky-500 text-white"
               >
-                บันทึก
+                บันทึกความคืบหน้า
               </button>
             </div>
           </div>
