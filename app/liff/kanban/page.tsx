@@ -47,14 +47,6 @@ const STATUS_RING: Record<Status, string> = {
   cancelled: "ring-zinc-300/50",
 };
 
-// สี Due Date: เลยกำหนด = แดง / ยังไม่เกิน = เขียว / ไม่ระบุ = เทา
-const dueClass = (due_at: string | null) => {
-  if (!due_at) return "text-gray-500";
-  const d = new Date(due_at).getTime();
-  const now = Date.now();
-  return d < now ? "text-red-600 font-semibold" : "text-green-600 font-semibold";
-};
-
 function fmtDate(v?: string | null) {
   if (!v) return "";
   try {
@@ -76,6 +68,32 @@ const PR_CHIP: Record<Task["priority"], string> = {
   medium: "bg-gradient-to-r from-amber-500/15 to-amber-400/10 text-amber-700 dark:text-amber-300 border border-amber-300/40",
   low: "bg-gradient-to-r from-emerald-500/15 to-emerald-400/10 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40",
 };
+
+/** 🆕 คำนวณข้อความ “ระยะเวลา” + สี ตาม due date และสถานะ */
+function dueMeta(t: Task): { text: string; cls: string } {
+  if (t.status === "done") {
+    return { text: "เสร็จสิ้น", cls: "text-emerald-600 font-semibold" };
+  }
+  if (!t.due_at) return { text: "", cls: "text-gray-500" };
+
+  const due = new Date(t.due_at);
+
+  // normalize เทียบแบบ “วันที่” ล้วน (ไม่สนเวลา) ตามเขตเวลาเครื่อง
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const startOfDue = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+
+  const MS = 24 * 60 * 60 * 1000;
+  const diff = Math.round((startOfDue - startOfToday) / MS); // >0 = ยังเหลือ, 0 = วันนี้, <0 = เลยแล้ว
+
+  if (diff > 0) {
+    return { text: `เหลืออีก ${diff} วัน`, cls: "text-green-600 font-semibold" };
+  } else if (diff === 0) {
+    return { text: "ครบกำหนดวันนี้", cls: "text-amber-600 font-semibold" };
+  } else {
+    return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold" };
+  }
+}
 
 // ===== Page =====
 export default function KanbanPage() {
@@ -290,78 +308,87 @@ export default function KanbanPage() {
                 </span>
               </div>
               <div className="flex-1 rounded-xl min-h-[200px] p-2">
-                {columns[s].map((t) => (
-                  <article
-                    key={t.id}
-                    draggable
-                    onDragStart={(e) => onDragStart(e, t.id)}
-                    onClick={() => openEditor(t)}
-                    className="rounded-2xl border bg-white dark:bg-slate-900 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 dark:ring-white/10 min-w-0"
-                  >
-                    <div className="grid grid-cols-[1fr_auto] gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium break-words hyphens-auto line-clamp-2 text-slate-800 dark:text-slate-100">
-                          {t.title}
-                        </div>
-                        {t.description && (
-                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-1">
-                            {t.description}
+                {columns[s].map((t) => {
+                  const meta = dueMeta(t);
+                  return (
+                    <article
+                      key={t.id}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, t.id)}
+                      onClick={() => openEditor(t)}
+                      className="rounded-2xl border bg-white dark:bg-slate-900 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 dark:ring-white/10 min-w-0"
+                    >
+                      <div className="grid grid-cols-[1fr_auto] gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium break-words hyphens-auto line-clamp-2 text-slate-800 dark:text-slate-100">
+                            {t.title}
                           </div>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block max-w-[6.5rem] truncate">
-                          code {t.code}
+                          {t.description && (
+                            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-1">
+                              {t.description}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block max-w-[6.5rem] truncate">
+                            code {t.code}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={cx("rounded-full px-2 py-0.5 border", PR_CHIP[t.priority])}>{t.priority}</span>
-                        <span>{t.progress ?? 0}%</span>
-                      </div>
-                      <div
-                        className={cx(
-                          "w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[11rem] truncate text-right",
-                          dueClass(t.due_at)
-                        )}
-                      >
-                        {t.due_at ? `กำหนด ${fmtDate(t.due_at)}` : ""}
-                      </div>
-                    </div>
+                      <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={cx("rounded-full px-2 py-0.5 border", PR_CHIP[t.priority])}>{t.priority}</span>
+                          <span>{t.progress ?? 0}%</span>
+                        </div>
 
-                    {/* progress bar */}
-                    <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                      <div
-                        className={cx(
-                          "h-full rounded-full bg-gradient-to-r",
-                          t.status === "done"
-                            ? "from-emerald-400 to-emerald-500"
-                            : t.status === "blocked"
-                            ? "from-rose-400 to-rose-500"
-                            : "from-indigo-400 to-sky-400"
-                        )}
-                        style={{
-                          width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%`,
-                        }}
-                      />
-                    </div>
-
-                    {t.tags && t.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {t.tags.map((tag, i) => (
-                          <span
-                            key={i}
-                            className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded px-2 py-0.5"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
+                        {/* 🆕 แสดงกำหนด + ระยะเวลา */}
+                        <div className="w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[14rem] text-right">
+                          {t.due_at && (
+                            <div className="truncate text-slate-600 dark:text-slate-300">
+                              กำหนด {fmtDate(t.due_at)}
+                            </div>
+                          )}
+                          {meta.text && (
+                            <div className={cx("truncate", meta.cls)}>
+                              {meta.text}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </article>
-                ))}
+
+                      {/* progress bar */}
+                      <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                        <div
+                          className={cx(
+                            "h-full rounded-full bg-gradient-to-r",
+                            t.status === "done"
+                              ? "from-emerald-400 to-emerald-500"
+                              : t.status === "blocked"
+                              ? "from-rose-400 to-rose-500"
+                              : "from-indigo-400 to-sky-400"
+                          )}
+                          style={{
+                            width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%`,
+                          }}
+                        />
+                      </div>
+
+                      {t.tags && t.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {t.tags.map((tag, i) => (
+                            <span
+                              key={i}
+                              className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded px-2 py-0.5"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
                 {columns[s].length === 0 && (
                   <div className="text-xs text-slate-500 dark:text-slate-400 italic">(ลากการ์ดมาวางที่นี่)</div>
                 )}
