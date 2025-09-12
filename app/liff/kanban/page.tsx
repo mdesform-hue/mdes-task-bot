@@ -47,7 +47,7 @@ const STATUS_RING: Record<Status, string> = {
   cancelled: "ring-zinc-300/50",
 };
 
-// สีของ due date: เลยกำหนด = แดง / ยังไม่เกิน = เขียว / ไม่ระบุ = เทา
+// สี Due Date: เลยกำหนด = แดง / ยังไม่เกิน = เขียว / ไม่ระบุ = เทา
 const dueClass = (due_at: string | null) => {
   if (!due_at) return "text-gray-500";
   const d = new Date(due_at).getTime();
@@ -132,11 +132,13 @@ export default function KanbanPage() {
     setLoading(true);
     try {
       const r = await fetch(
-        `/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`
+        `/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}${
+          q ? `&q=${encodeURIComponent(q)}` : ""
+        }`
       );
       if (!r.ok) throw new Error(await r.text());
-      const rows: Task[] = await r.json(); // รองรับ API ที่ส่ง array ตรง ๆ
-      setData(Array.isArray(rows) ? rows : (rows as any)?.items ?? []);
+      const rows: Task[] | { items: Task[] } = await r.json();
+      setData(Array.isArray(rows) ? rows : rows.items ?? []);
     } catch (e) {
       console.error(e);
       alert("โหลดงานไม่สำเร็จ ตรวจสอบ groupId หรือ adminKey");
@@ -228,7 +230,7 @@ export default function KanbanPage() {
 
       {/* ===== Content ===== */}
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto flex-1">
-        {/* ✅ Toolbar กลับมาแล้ว */}
+        {/* Toolbar */}
         <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
           <div className="flex-1">
             <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">Group ID</label>
@@ -294,29 +296,37 @@ export default function KanbanPage() {
                     draggable
                     onDragStart={(e) => onDragStart(e, t.id)}
                     onClick={() => openEditor(t)}
-                    className="rounded-2xl border bg-white dark:bg-slate-900 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 dark:ring-white/10"
+                    className="rounded-2xl border bg-white dark:bg-slate-900 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 dark:ring-white/10 min-w-0"
                   >
                     <div className="grid grid-cols-[1fr_auto] gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-100">{t.title}</div>
+                        <div className="text-sm font-medium break-words hyphens-auto line-clamp-2 text-slate-800 dark:text-slate-100">
+                          {t.title}
+                        </div>
                         {t.description && (
-                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{t.description}</div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-1">
+                            {t.description}
+                          </div>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block">
+                        <div className="text-[10px] bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 inline-block max-w-[6.5rem] truncate">
                           code {t.code}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-2 text-xs gap-2">
+                    <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
                       <div className="flex items-center gap-2">
                         <span className={cx("rounded-full px-2 py-0.5 border", PR_CHIP[t.priority])}>{t.priority}</span>
                         <span>{t.progress ?? 0}%</span>
                       </div>
-                      {/* due date สีแดง/เขียว */}
-                      <div className={cx("whitespace-nowrap", dueClass(t.due_at))}>
+                      <div
+                        className={cx(
+                          "w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[11rem] truncate text-right",
+                          dueClass(t.due_at)
+                        )}
+                      >
                         {t.due_at ? `กำหนด ${fmtDate(t.due_at)}` : ""}
                       </div>
                     </div>
@@ -369,7 +379,9 @@ export default function KanbanPage() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-sm text-slate-500">ปรับความคืบหน้า</div>
-                <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">{editTask.title}</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">
+                  {editTask.title}
+                </div>
                 <div className="text-xs text-slate-500 mt-1">code {editTask.code}</div>
               </div>
               <button
@@ -397,7 +409,9 @@ export default function KanbanPage() {
                   min={0}
                   max={100}
                   value={progressDraft}
-                  onChange={(e) => setProgressDraft(Math.max(0, Math.min(100, Number(e.target.value))))}
+                  onChange={(e) =>
+                    setProgressDraft(Math.max(0, Math.min(100, Number(e.target.value))))
+                  }
                   className="w-20 border rounded px-2 py-1 bg-white/80 dark:bg-slate-800/80"
                 />
               </div>
