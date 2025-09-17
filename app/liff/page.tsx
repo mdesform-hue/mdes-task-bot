@@ -2,6 +2,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import Script from "next/script";
+import Link from "next/link";
 
 type Task = {
   id: string;
@@ -213,7 +214,20 @@ export default function LiffAdminPage() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
-      <h1 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6">LIFF Admin — Tasks</h1>
+
+      {/* Header + Link to Kanban */}
+      <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <h1 className="text-xl md:text-2xl font-semibold">LIFF Admin — Tasks</h1>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/liff/kanban"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gradient-to-r from-indigo-600 to-sky-500 text-white shadow-sm hover:shadow-md active:scale-[.98]"
+          >
+            เปิด Kanban View
+            <span aria-hidden>↗</span>
+          </Link>
+        </div>
+      </div>
 
       {/* ===== Toolbar ===== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-4">
@@ -243,6 +257,10 @@ export default function LiffAdminPage() {
             <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
             <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>Reload</button>
             <button className="bg-gray-700 text-white px-3 py-3 md:py-2 rounded" onClick={() => { const u=new URL(location.href); u.searchParams.set("key",adminKey||""); if(groupId)u.searchParams.set("group_id",groupId); navigator.clipboard.writeText(u.toString()); alert("คัดลอกลิงก์แล้ว"); }}>Copy</button>
+            {/* Duplicate link in toolbar for visibility */}
+            <Link href="/liff/kanban" className="px-3 py-3 md:py-2 rounded bg-indigo-600 text-white">
+              Kanban
+            </Link>
           </div>
         </div>
       </div>
@@ -481,7 +499,7 @@ export default function LiffAdminPage() {
 
             return (
               <div key={k} className={[
-                "min-h[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
+                "min-h-[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
                 inMonth ? "bg-white" : "bg-gray-50 text-gray-400",
                 isToday ? "ring-2 ring-blue-500" : ""
               ].join(" ")}>
