@@ -181,7 +181,7 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // ไม่ลงตาราง → แค่สร้าง Task (มี due ถ้าตีความได้)
+        // ไม่ลงตาราง → แค่สร้าง Task (มี due ถ้าตีความได้
         const dueISO = when?.startISO ?? null;
         let code = Math.floor(Math.random()*10000).toString().padStart(4,"0");
         let created: any[] = [];
