@@ -2,75 +2,102 @@
 export const runtime = "nodejs";
 
 import crypto from "crypto";
-import { google } from "googleapis";
 import { sql } from "../../../../lib/db";
+import { createCalendarEvent } from "../../../../lib/gcal";
 
-// ---------------------------------------------------------------------------
-// TIME HELPERS (โซนไทย, ไม่ใช้ toISOString)
-// ---------------------------------------------------------------------------
+// ---------- CONFIG ----------
 const TZ = "Asia/Bangkok";
-const pad = (n: number) => String(n).padStart(2, "0");
 
-// คืนค่าสตริง RFC3339 ที่ผูกออฟเซ็ต +07:00 เช่น 2025-09-19T10:00:00+07:00
-function rfcBkk(y: number, m: number, d: number, hh = 0, mm = 0) {
-  return `${y}-${pad(m)}-${pad(d)}T${pad(hh)}:${pad(mm)}:00+07:00`;
+// ---------- Healthcheck ----------
+export async function GET() { return new Response("ok", { status: 200 }); }
+export async function HEAD() { return new Response(null, { status: 200 }); }
+
+// ---------- Helpers (AI intent & parsing) ----------
+function hasScheduleKeyword(text: string) {
+  return /ลงตาราง/i.test(text);
 }
 
-// บวกนาที โดยยึดเวลาไทย (เลี่ยงการแปลงเป็น UTC/ISO)
-function addMinutesBkk(
-  y: number,
-  m: number,
-  d: number,
-  hh: number,
-  mm: number,
-  plus: number
-) {
-  // สร้าง epoch โดยสมมติว่าเวลาอินพุตคือ +07:00 (ลบ 7 ชม. ตอนแปลงเป็น UTC)
-  const utc = Date.UTC(y, m - 1, d, hh - 7, mm) + plus * 60_000;
-  // กลับมาอ่านส่วนประกอบวัน/เวลาในโซนไทย (บวก 7 ชม.)
-  const t = new Date(utc + 7 * 60 * 60 * 1000);
-  return {
-    y: t.getUTCFullYear(),
-    m: t.getUTCMonth() + 1,
-    d: t.getUTCDate(),
-    hh: t.getUTCHours(),
-    mm: t.getUTCMinutes(),
-  };
+function extractEmails(text: string): string[] {
+  const picked = new Set<string>();
+  // email=someone@domain
+  const p = /email\s*=\s*([^\s|,;]+)/i.exec(text)?.[1];
+  if (p) picked.add(p);
+  // อีเมลที่โผล่ในประโยค
+  for (const m of text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)) {
+    picked.add(m[0]);
+  }
+  return Array.from(picked);
 }
 
-// ฟอร์แมตเวลาไทยเพื่อแสดงผลในข้อความตอบกลับ
-function fmtBkk(dt: string) {
+function extractTitle(raw: string) {
+  let t = raw.replace(/^ai\s*/i, "").trim();
+  t = t.replace(/^ลงตาราง\s*/i, "").trim();
+  return t;
+}
+
+// คืนช่วงเวลา 60 นาที ถ้าตีความได้ (ระวังโซนเวลาให้เป็น Bangkok ตั้งแต่ต้น)
+function parseThaiDate(text: string): { startISO: string; endISO: string } | null {
+  const now = new Date();
+  const bkkNow = new Date(now.toLocaleString("en-US", { timeZone: TZ }));
+
+  // พรุ่งนี้ HH โมง  (แก้ให้สร้างเป็นเวลาพร้อม +07:00)
+  let m = text.match(/พรุ่งนี้\s*(\d{1,2})\s*โมง/i);
+  if (m) {
+    const hh = Math.max(0, Math.min(23, parseInt(m[1], 10)));
+
+    // ใช้วันที่ "พรุ่งนี้" อ้างอิงจากเวลาโซนกรุงเทพ
+    const bkkBase = new Date(bkkNow);
+    bkkBase.setDate(bkkBase.getDate() + 1);
+
+    const y  = bkkBase.getFullYear();
+    const mo = bkkBase.getMonth() + 1; // 1-12
+    const dd = bkkBase.getDate();
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    // ระบุโซนเวลาไทยชัดเจนตั้งแต่ต้น
+    const start = new Date(`${y}-${pad(mo)}-${pad(dd)}T${pad(hh)}:00:00+07:00`);
+    const end   = new Date(start.getTime() + 60 * 60 * 1000);
+    return { startISO: start.toISOString(), endISO: end.toISOString() };
+  }
+
+  // <วันที่เดือนนี้> HH โมง  เช่น "27 10 โมง"
+  m = text.match(/\b(\d{1,2})\s+(\d{1,2})\s*โมง\b/);
+  if (m) {
+    const dd = Math.max(1, Math.min(31, parseInt(m[1], 10)));
+    const hh = Math.max(0, Math.min(23, parseInt(m[2], 10)));
+    const y = bkkNow.getFullYear();
+    const mo = bkkNow.getMonth() + 1; // เดือนนี้ (1-12)
+    const pad = (n: number) => String(n).padStart(2, "0");
+    // สร้างเวลาแบบไทยแล้วแปลงเป็น ISO
+    const start = new Date(`${y}-${pad(mo)}-${pad(dd)}T${pad(hh)}:00:00+07:00`);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    return { startISO: start.toISOString(), endISO: end.toISOString() };
+  }
+
+  // รูปแบบชัดเจน: due=YYYY-MM-DD | time=HH:MM
+  const due = /due=(\d{4}-\d{2}-\d{2})/i.exec(text)?.[1];
+  const tim = /time=(\d{1,2}):(\d{2})/i.exec(text);
+  if (due) {
+    const hh = tim ? Number(tim[1]) : 9;
+    const mm = tim ? Number(tim[2]) : 0;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const start = new Date(`${due}T${pad(hh)}:${pad(mm)}:00+07:00`);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    return { startISO: start.toISOString(), endISO: end.toISOString() };
+  }
+
+  return null;
+}
+
+function fmtDate(d: string | Date) {
+  const dt = typeof d === "string" ? new Date(d) : d;
   return new Intl.DateTimeFormat("th-TH", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dt));
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit"
+  }).format(dt);
 }
 
-// ---------------------------------------------------------------------------
-// Google Calendar (Service Account)
-// ---------------------------------------------------------------------------
-function getGoogleAuth() {
-  const clientEmail = process.env.GOOGLE_SERVICE_EMAIL || "";
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY || "";
-  // รองรับคีย์ที่เก็บมาเป็นบรรทัดเดียว (มี \n) ให้แปลงกลับเป็นบรรทัดจริง
-  privateKey = privateKey.replace(/\\n/g, "\n");
-  return new google.auth.JWT({
-    email: clientEmail,
-    key: privateKey,
-    scopes: ["https://www.googleapis.com/auth/calendar"],
-  });
-}
-function getCalendar() {
-  return google.calendar({ version: "v3", auth: getGoogleAuth() });
-}
-
-// ---------------------------------------------------------------------------
-// LINE util
-// ---------------------------------------------------------------------------
 async function reply(replyToken: string, message: any) {
   await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
@@ -85,9 +112,9 @@ async function reply(replyToken: string, message: any) {
 function helpText(gid?: string) {
   const lines = [
     "🧭 คำสั่งที่ใช้ได้:",
-    "• ai ลงตาราง <เรื่อง> พรุ่งนี้ | 27 10 โมง | due=YYYY-MM-DD time=HH:MM | email=a@b.com",
-    "  - ถ้าไม่ใส่ 'ลงตาราง' จะสร้างเป็นงาน (Task) อย่างเดียว",
-    "• add ชื่องาน | desc=รายละเอียด | due=YYYY-MM-DD",
+    "• ai ลงตาราง <เรื่อง> พรุ่งนี้ 10 โมง | 27 10 โมง | due=YYYY-MM-DD time=HH:MM | email=a@b.com",
+    "   - ถ้าไม่ใส่ 'ลงตาราง' จะสร้างเป็นงาน (Task) อย่างเดียว",
+    "• add ชืองาน | desc=รายละเอียด | due=YYYY-MM-DD",
     "• list — แสดงรายการงาน",
     "• list today — เฉพาะงานวันนี้",
     "• progress <code> <เปอร์เซ็นต์ หรือ +10/-5>",
@@ -98,49 +125,14 @@ function helpText(gid?: string) {
   return lines.join("\n");
 }
 
-function fmtDate(d: string | Date) {
-  const dt = typeof d === "string" ? new Date(d) : d;
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(dt);
-}
-
-// ดึงอีเมลทั้งหมดจากข้อความ (แบบไม่ใช้ matchAll เพื่อรองรับ target ต่ำ)
-function extractEmails(text: string): string[] {
-  const picked = new Set<string>();
-  const re = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    picked.add(m[0]);
-  }
-  return Array.from(picked);
-}
-
-// ---------------------------------------------------------------------------
-// Healthcheck
-// ---------------------------------------------------------------------------
-export async function GET() {
-  return new Response("ok", { status: 200 });
-}
-export async function HEAD() {
-  return new Response(null, { status: 200 });
-}
-
-// ---------------------------------------------------------------------------
-// Webhook
-// ---------------------------------------------------------------------------
+// ---------- Webhook ----------
 export async function POST(req: Request) {
   // verify LINE signature
   const raw = Buffer.from(await req.arrayBuffer());
   const sig = req.headers.get("x-line-signature") ?? "";
   const h = crypto.createHmac("sha256", process.env.LINE_CHANNEL_SECRET!);
   h.update(raw);
-  if (sig !== h.digest("base64")) {
-    return new Response("bad signature", { status: 400 });
-  }
+  if (sig !== h.digest("base64")) return new Response("bad signature", { status: 400 });
 
   const { events } = JSON.parse(raw.toString("utf8") || "{}");
 
@@ -151,269 +143,150 @@ export async function POST(req: Request) {
     const groupId: string = ev.source.groupId;
     const text = (ev.message.text as string).trim();
 
-    // help
-    if (/^(help|ช่วยเหลือ)$/i.test(text)) {
-      await reply(ev.replyToken, { type: "text", text: helpText(groupId) });
-      continue;
-    }
-
-    // -----------------------------------------------------------------------
-    // AI mode: ถ้ามี "ai" นำหน้า
-    // - ถ้าข้อความมีคำว่า "ลงตาราง" → สร้าง Google Calendar + บันทึก task
-    // - ถ้าไม่มีคำว่า "ลงตาราง" → บันทึก task อย่างเดียว
-    // ตัวอย่าง:  ai ลงตาราง ส่งใบเสนอราคา พรุ่งนี้ 10 โมง
-    //           ai ลงตาราง ส่งของ 27 10 โมง
-    //           ai เตรียมเอกสาร พรุ่งนี้ 9 โมง
-    // -----------------------------------------------------------------------
+    // ---- AI Intent (ดักก่อน) ----
     if (/^ai\s+/i.test(text)) {
-      const lower = text.toLowerCase();
-      const wantCalendar = lower.includes("ลงตาราง");
-
-      // แยก title อย่างง่าย: ตัดคำว่า "ai" และ "ลงตาราง" ออก
-      let title = text.replace(/^ai\s+/i, "");
-      title = title.replace(/^ลงตาราง\s*/i, "").trim();
-
-      // หาเวลา: รองรับ "พรุ่งนี้ HH โมง" | "วันนี้ HH โมง" | "27 10 โมง" | due= | time=
-      const now = new Date();
-      // เวลาไทย
-      const todayBkk = new Date(
-        Date.UTC(
-          now.getUTCFullYear(),
-          now.getUTCMonth(),
-          now.getUTCDate(),
-          now.getUTCHours() + 7,
-          now.getUTCMinutes()
-        )
-      );
-      let y = todayBkk.getUTCFullYear();
-      let m = todayBkk.getUTCMonth() + 1;
-      let d = todayBkk.getUTCDate();
-      let hh = 9;
-      let mm = 0;
-
-      // parse due=YYYY-MM-DD
-      const dueMatch = text.match(/\bdue=(\d{4})-(\d{2})-(\d{2})\b/i);
-      if (dueMatch) {
-        y = parseInt(dueMatch[1], 10);
-        m = parseInt(dueMatch[2], 10);
-        d = parseInt(dueMatch[3], 10);
-      }
-
-      // parse time=HH:MM
-      const timeMatch = text.match(/\btime=(\d{1,2}):(\d{2})\b/i);
-      if (timeMatch) {
-        hh = parseInt(timeMatch[1], 10);
-        mm = parseInt(timeMatch[2], 10);
-      }
-
-      // "พรุ่งนี้ 10 โมง" | "วันนี้ 14 โมง"
-      const rxDayHour = /(วันนี้|พรุ่งนี้)\s*(\d{1,2})\s*โมง/;
-      const dh = text.match(rxDayHour);
-      if (dh) {
-        const word = dh[1];
-        const hour = parseInt(dh[2], 10);
-        if (word === "พรุ่งนี้") {
-          // +1 วัน (เวลาไทย)
-          const add1 = addMinutesBkk(y, m, d, 0, 0, 24 * 60);
-          y = add1.y;
-          m = add1.m;
-          d = add1.d;
-        }
-        hh = hour;
-        mm = 0;
-      }
-
-      // "27 10 โมง" (27 ของเดือนนี้)
-      const rxDomHour = /\b(\d{1,2})\s+(\d{1,2})\s*โมง/;
-      const dm = text.match(rxDomHour);
-      if (dm) {
-        d = parseInt(dm[1], 10);
-        hh = parseInt(dm[2], 10);
-        // เดือนไม่ระบุ → ใช้เดือนนี้ (ถ้าเลยไปแล้วค่อยข้ามเดือนเองได้ตามต้องการ)
-      }
-
-      // ถ้า title ว่างมาก ให้ fallback
-      if (!title || /^ลงตาราง$/i.test(title)) title = "งานใหม่";
-
-      // ดึง emails (ถ้ามี)
-      const emails = extractEmails(text);
-
-      // สร้าง task เสมอ (AI โหมดต้องมีใน DB)
       try {
+        const wantCalendar = hasScheduleKeyword(text);
+        const emails = extractEmails(text);
+        const when = parseThaiDate(text); // อาจได้หรือไม่ได้
+
+        const titleRaw = extractTitle(text);
+        const title = titleRaw
+          .replace(/พรุ่งนี้\s*\d{1,2}\s*โมง/i, "")
+          .replace(/\b\d{1,2}\s+\d{1,2}\s*โมง\b/, "")
+          .replace(/due=\d{4}-\d{2}-\d{2}/i, "")
+          .replace(/time=\d{1,2}:\d{2}/i, "")
+          .replace(/email=[^\s|,;]+/i, "")
+          .replace(/\s{2,}/g, " ")
+          .trim() || "งานใหม่";
+
+        // ensure group
         await sql/* sql */`
-          insert into public.groups(id) values(${groupId})
+          insert into public.groups (id) values (${groupId})
           on conflict (id) do nothing`;
-        // สุ่ม code 4 หลักแบบ unique ต่อ group
-        const gen4 = () =>
-          Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-        let code = gen4();
-        let created: any[] = [];
-        for (let i = 0; i < 25; i++) {
-          try {
-            created = await sql/* sql */`
-              insert into public.tasks(group_id, code, title, description, due_at)
-              values (${groupId}, ${code}, ${title}, null, ${
-              rfcBkk(y, m, d, hh, mm)
-            })
-              returning id, code, title, due_at`;
-            break;
-          } catch (e: any) {
-            const msg = String(e?.message ?? e);
-            if (msg.includes("duplicate key")) {
-              code = gen4();
-              continue;
-            }
-            throw e;
-          }
-        }
 
-        // ถ้าขอ "ลงตาราง" → ยิง Google Calendar ด้วยเวลาไทย
-        if (wantCalendar) {
-          const startStr = rfcBkk(y, m, d, hh, mm);
-          const duration =
-            Number(process.env.DEFAULT_EVENT_DURATION_MIN ?? "60") || 60;
-          const endParts = addMinutesBkk(y, m, d, hh, mm, duration);
-          const endStr = rfcBkk(
-            endParts.y,
-            endParts.m,
-            endParts.d,
-            endParts.hh,
-            endParts.mm
-          );
+        // ถ้ามี "ลงตาราง" และตีความเวลาได้ → Calendar + Task
+        if (wantCalendar && when) {
+          const ins = await sql/* sql */`
+            insert into public.tasks (group_id, code, title, description, due_at)
+            values (
+              ${groupId},
+              lpad((floor(random()*10000))::text, 4, '0'),
+              ${title},
+              ${null},
+              ${when.startISO}
+            )
+            returning code`;
 
-          try {
-            const calendar = getCalendar();
-            await calendar.events.insert({
-              calendarId: "primary", // ถ้าใช้ SA เข้าปฏิทินเฉพาะที่แชร์สิทธิ์ให้ Service Account
-              requestBody: {
-                summary: title,
-                start: { dateTime: startStr, timeZone: TZ },
-                end: { dateTime: endStr, timeZone: TZ },
-                attendees: emails.map((e) => ({ email: e })),
-              },
-            });
-
-            await reply(ev.replyToken, {
-              type: "text",
-              text:
-                "📅 ลงตารางแล้ว\n" +
-                `• เรื่อง: ${title}\n` +
-                `• เวลา: ${fmtBkk(startStr)} - ${fmtBkk(endStr)}`,
-            });
-          } catch (e: any) {
-            console.error("CALENDAR_ERR", e);
-            await reply(ev.replyToken, {
-              type: "text",
-              text:
-                "สร้าง Task สำเร็จ แต่ลง Calendar ไม่สำเร็จ\n" +
-                "ตรวจสิทธิ์แชร์ปฏิทินให้ Service Account และค่า ENV อีกครั้ง",
-            });
-          }
-        } else {
-          // แค่ task
-          const r = created[0];
-          await reply(ev.replyToken, {
-            type: "text",
-            text:
-              `🆕 เพิ่มงานแล้ว\n• CODE: ${r.code}\n• เรื่อง: ${r.title}` +
-              (r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""),
+          await createCalendarEvent({
+            title,
+            startISO: when.startISO,
+            endISO: when.endISO,
+            attendees: emails,
+            description: `สร้างจาก LINE group ${groupId} / task code=${ins[0].code}`,
           });
-        }
-      } catch (e: any) {
-        console.error("AI_TASK_ERR", e);
-        await reply(ev.replyToken, {
-          type: "text",
-          text: "เพิ่มงาน (AI) ไม่สำเร็จ กรุณาลองใหม่ หรือพิมพ์ help",
-        });
-      }
-      continue;
-    }
 
-    // -----------------------------------------------------------------------
-    // add <title> | desc=... | due=YYYY-MM-DD
-    // -----------------------------------------------------------------------
-    if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
-      try {
-        const m = text
-          .replace(/^(add|เพิ่ม)\s+/i, "")
-          .match(
-            /^(.*?)(?:\s*\|\s*desc=(.*?))?(?:\s*\|\s*due=(\d{4}-\d{2}-\d{2}))?\s*$/
-          );
-
-        if (!m) {
           await reply(ev.replyToken, {
             type: "text",
-            text:
-              "รูปแบบไม่ถูกต้อง\nตัวอย่าง:\nadd ชื่องาน | desc=รายละเอียด | due=2025-09-01",
+            text: `📅 ลงตารางแล้ว\n• เรื่อง: ${title}\n• เวลา: ${fmtDate(when.startISO)} - ${fmtDate(when.endISO)}${emails.length ? `\n• เชิญ: ${emails.join(", ")}` : ""}`
           });
           continue;
         }
 
-        const title = (m[1] || "").trim();
-        const desc = m[2]?.trim() || null;
-        const due = m[3]?.trim() || null;
-
-        if (!title) {
-          await reply(ev.replyToken, {
-            type: "text",
-            text:
-              "กรุณาระบุชื่อเรื่องงาน เช่น:\nadd เตรียมเอกสาร | desc=สำหรับประชุม | due=2025-09-01",
-          });
-          continue;
-        }
-
-        await sql/* sql */`
-          insert into public.groups(id) values (${groupId})
-          on conflict (id) do nothing`;
-
-        // ถ้ามี due= ใช้ 00:00 โซนไทย → RFC +07:00
-        let dueIso: string | null = null;
-        if (due) {
-          const [yy, mm, dd] = due.split("-").map((n) => parseInt(n, 10));
-          dueIso = rfcBkk(yy, mm, dd, 0, 0);
-        }
-
-        const gen4 = () =>
-          Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-
-        let code = gen4();
+        // ไม่ลงตาราง → แค่สร้าง Task (มี due ถ้าตีความได้)
+        const dueISO = when?.startISO ?? null;
+        let code = Math.floor(Math.random()*10000).toString().padStart(4,"0");
         let created: any[] = [];
         for (let i = 0; i < 25; i++) {
           try {
             created = await sql/* sql */`
               insert into public.tasks (group_id, code, title, description, due_at)
-              values (${groupId}, ${code}, ${title}, ${desc}, ${dueIso})
+              values (${groupId}, ${code}, ${title}, ${null}, ${dueISO})
               returning code, title, due_at`;
             break;
-          } catch (e: any) {
+          } catch (e:any) {
             const msg = String(e?.message ?? e);
-            if (msg.includes("duplicate key")) {
-              code = gen4();
-              continue;
-            }
+            if (msg.includes("duplicate key")) { code = Math.floor(Math.random()*10000).toString().padStart(4,"0"); continue; }
             throw e;
           }
         }
         const r = created[0];
         await reply(ev.replyToken, {
           type: "text",
-          text:
-            `🆕 เพิ่มงานแล้ว\n• CODE: ${r.code}\n• เรื่อง: ${r.title}` +
-            (r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""),
+          text: `🆕 เพิ่มงานแล้ว\n• CODE: ${r.code}\n• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}`
         });
-      } catch (e: any) {
-        console.error("ADD_ERR", e);
-        await reply(ev.replyToken, {
-          type: "text",
-          text: "เพิ่มงานไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูรูปแบบคำสั่ง",
-        });
+      } catch (e:any) {
+        console.error("AI_INTENT_ERR", e);
+        await reply(ev.replyToken, { type: "text", text: "ดำเนินการไม่สำเร็จ ลองใหม่อีกครั้ง หรือระบุเวลาให้ชัดเจน" });
       }
       continue;
     }
 
-    // -----------------------------------------------------------------------
-    // list / list today
-    // -----------------------------------------------------------------------
+    // ---- help ----
+    if (/^(help|ช่วยเหลือ)$/i.test(text)) {
+      await reply(ev.replyToken, { type: "text", text: helpText(groupId) });
+      continue;
+    }
+
+    // ---- add <title> | desc=... | due=YYYY-MM-DD ----
+    if (/^add\s+/i.test(text) || /^เพิ่ม\s+/i.test(text)) {
+      try {
+        const m = text
+          .replace(/^(add|เพิ่ม)\s+/i, "")
+          .match(/^(.*?)(?:\s*\|\s*desc=(.*?))?(?:\s*\|\s*due=(\d{4}-\d{2}-\d{2}))?\s*$/);
+
+        if (!m) {
+          await reply(ev.replyToken, { type: "text",
+            text: "รูปแบบไม่ถูกต้อง\nตัวอย่าง:\nadd ชื่องาน | desc=รายละเอียด | due=2025-09-01" });
+          continue;
+        }
+
+        const title = (m[1] || "").trim();
+        const desc  = m[2]?.trim() || null;
+        const due   = m[3]?.trim() || null;
+
+        if (!title) {
+          await reply(ev.replyToken, { type: "text",
+            text: "กรุณาระบุชื่อเรื่องงาน เช่น:\nadd เตรียมเอกสาร | desc=สำหรับประชุม | due=2025-09-01" });
+          continue;
+        }
+
+        await sql/* sql */`
+          insert into public.groups(id) values(${groupId})
+          on conflict (id) do nothing`;
+
+        const dueIso = due ? new Date(`${due}T00:00:00+07:00`).toISOString() : null;
+
+        const genCode4 = () => Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+        let code = genCode4();
+        let row: any;
+        for (let i = 0; i < 25; i++) {
+          try {
+            const r = await sql/* sql */`
+              insert into public.tasks (group_id, code, title, description, due_at)
+              values (${groupId}, ${code}, ${title}, ${desc}, ${dueIso})
+              returning code, title, due_at`;
+            row = r[0]; break;
+          } catch (e:any) {
+            if (String(e?.message ?? e).includes("duplicate key")) { code = genCode4(); continue; }
+            throw e;
+          }
+        }
+        if (!row) throw new Error("Cannot allocate code");
+
+        await reply(ev.replyToken, {
+          type: "text",
+          text: `🆕 เพิ่มงานแล้ว\n• CODE: ${row.code}\n• เรื่อง: ${row.title}${row.due_at ? `\n• กำหนด: ${fmtDate(row.due_at)}` : ""}`
+        });
+      } catch (e:any) {
+        console.error("ADD_ERR", e);
+        await reply(ev.replyToken, { type: "text",
+          text: "เพิ่มงานไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูรูปแบบคำสั่ง" });
+      }
+      continue;
+    }
+
+    // ---- list / list today ----
     if (/^list(\s+today)?$/i.test(text) || /^รายการ/i.test(text)) {
       const onlyToday = /today/i.test(text);
       const rows = onlyToday
@@ -421,7 +294,7 @@ export async function POST(req: Request) {
             select code, title, status, due_at, progress
             from public.tasks
             where group_id=${groupId}
-              and date(timezone('Asia/Bangkok', due_at)) = date(timezone('Asia/Bangkok', now()))
+              and date(timezone(${TZ}, due_at)) = date(timezone(${TZ}, now()))
             order by coalesce(due_at, now()+interval '10 years') asc
             limit 50`
         : await sql/* sql */`
@@ -432,47 +305,35 @@ export async function POST(req: Request) {
             limit 50`;
 
       if (!rows.length) {
-        await reply(ev.replyToken, {
-          type: "text",
-          text: onlyToday ? "วันนี้ยังไม่มีงาน" : "ยังไม่มีงานในกลุ่มครับ",
-        });
+        await reply(ev.replyToken, { type: "text", text: onlyToday ? "วันนี้ยังไม่มีงาน" : "ยังไม่มีงานในกลุ่มครับ" });
         continue;
       }
 
-      const body = rows
-        .map(
-          (r: any, i: number) =>
-            `${i + 1}. [${r.status ?? "todo"}] ${r.title}` +
-            (r.due_at ? `  (due: ${fmtDate(r.due_at)})` : "") +
-            `\n   code=${r.code}  progress=${r.progress ?? 0}%`
-        )
-        .join("\n");
+      const body = rows.map((r: any, i: number) =>
+        `${i + 1}. [${r.status ?? "todo"}] ${r.title}` +
+        (r.due_at ? `  (due: ${fmtDate(r.due_at)})` : "") +
+        `\n   code=${r.code}  progress=${r.progress ?? 0}%`
+      ).join("\n");
 
       await reply(ev.replyToken, {
         type: "text",
-        text: `📋 รายการงาน${onlyToday ? " (วันนี้)" : ""}\n` + body,
+        text: `📋 รายการงาน${onlyToday ? " (วันนี้)" : ""}\n` + body
       });
       continue;
     }
 
-    // -----------------------------------------------------------------------
-    // progress <code> <เปอร์เซ็นต์ หรือ +10/-5>
-    // -----------------------------------------------------------------------
-    if (
-      text.toLowerCase().startsWith("progress ") ||
-      text.toLowerCase().startsWith("update ") ||
-      text.startsWith("เปอร์เซ็นต์ ")
-    ) {
+    // ---- progress <code> <เปอร์เซ็นต์ หรือ +10/-5> ----
+    if (text.toLowerCase().startsWith("progress ") || text.toLowerCase().startsWith("update ")
+        || text.startsWith("เปอร์เซ็นต์ ")) {
       try {
         const parts = text.trim().split(/\s+/);
-        const key = parts[1]; // code 4 หลัก หรือ UUID
-        let val = (parts[2] || "").replace(/%$/, "");
+        const key   = parts[1];
+        let val     = (parts[2] || "").replace(/%$/, "");
 
         if (!key || !val) {
           await reply(ev.replyToken, {
             type: "text",
-            text:
-              "ตัวอย่าง:\nprogress 1234 50\nprogress 1234 +10\nprogress 1234 -5",
+            text: "ตัวอย่าง:\nprogress 1234 50\nprogress 1234 +10\nprogress 1234 -5"
           });
           continue;
         }
@@ -483,13 +344,10 @@ export async function POST(req: Request) {
           where group_id=${groupId} and (code=${key} or id::text=${key})
           limit 1`;
         if (!found.length) {
-          await reply(ev.replyToken, {
-            type: "text",
-            text: "ไม่พบน้ำงานที่ระบุ (ตรวจสอบ code อีกครั้ง)",
-          });
+          await reply(ev.replyToken, { type: "text", text: "ไม่พบน้ำงานที่ระบุ (ตรวจสอบ code อีกครั้ง)" });
           continue;
         }
-        const t = found[0];
+        const t   = found[0];
         const cur = Number(t.progress ?? 0);
 
         const isDelta = /^[+-]/.test(val);
@@ -499,11 +357,8 @@ export async function POST(req: Request) {
         next = Math.max(0, Math.min(100, next));
 
         const nextStatus =
-          next >= 100
-            ? "done"
-            : t.status === "todo" && next > 0
-            ? "in_progress"
-            : t.status;
+          next >= 100 ? 'done'
+          : (t.status === 'todo' && next > 0 ? 'in_progress' : t.status);
 
         await sql/* sql */`
           update public.tasks
@@ -514,38 +369,26 @@ export async function POST(req: Request) {
 
         await reply(ev.replyToken, {
           type: "text",
-          text: `อัปเดตความคืบหน้า [${t.code}] ${cur}% → ${next}%${
-            next === 100 ? " ✅ (done)" : ""
-          }`,
+          text: `อัปเดตความคืบหน้า [${t.code}] ${cur}% → ${next}%${next===100 ? " ✅ (done)" : ""}`
         });
 
         try {
           await sql/* sql */`
             insert into public.task_updates (task_id, actor_id, note, progress, new_status)
             values (${t.id}, ${ev.source.userId ?? null}, 'progress update via chat', ${next}, ${nextStatus}::task_status)`;
-        } catch (e) {
-          console.error("LOG_FAIL", e);
-        }
-      } catch (e: any) {
+        } catch (e) { console.error("LOG_FAIL", e); }
+      } catch (e:any) {
         console.error("PROGRESS_ERR", e);
-        await reply(ev.replyToken, {
-          type: "text",
-          text: "อัปเดตเปอร์เซ็นต์ไม่สำเร็จ",
-        });
+        await reply(ev.replyToken, { type: "text", text: "อัปเดตเปอร์เซ็นต์ไม่สำเร็จ" });
       }
       continue;
     }
 
-    // -----------------------------------------------------------------------
-    // done <code>
-    // -----------------------------------------------------------------------
+    // ---- done <code> ----
     if (/^done\s+/i.test(text) || /^เสร็จ\s+/i.test(text)) {
       const key = text.replace(/^(done|เสร็จ)\s+/i, "").trim();
       if (!key) {
-        await reply(ev.replyToken, {
-          type: "text",
-          text: "พิมพ์: done <code>\nเช่น: done 0123",
-        });
+        await reply(ev.replyToken, { type: "text", text: "พิมพ์: done <code>\nเช่น: done 0123" });
         continue;
       }
       const updated = await sql/* sql */`
@@ -555,20 +398,15 @@ export async function POST(req: Request) {
           and (code=${key} or id::text=${key})
         returning code, title`;
       if (!updated.length) {
-        await reply(ev.replyToken, {
-          type: "text",
-          text: "ไม่พบงานที่ระบุ (ตรวจสอบ code อีกครั้ง)",
-        });
+        await reply(ev.replyToken, { type: "text", text: "ไม่พบงานที่ระบุ (ตรวจสอบ code อีกครั้ง)" });
         continue;
       }
-      await reply(ev.replyToken, {
-        type: "text",
-        text: `✅ ทำเสร็จแล้ว: ${updated[0].title}\n(code=${updated[0].code})`,
-      });
+      await reply(ev.replyToken, { type: "text",
+        text: `✅ ทำเสร็จแล้ว: ${updated[0].title}\n(code=${updated[0].code})` });
       continue;
     }
 
-    // default → help
+    // ---- default ----
     await reply(ev.replyToken, { type: "text", text: helpText(groupId) });
   }
 
