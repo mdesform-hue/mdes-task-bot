@@ -34,7 +34,6 @@ const readFirst = (keys: string[]): string => {
   try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
   return "";
 };
-const writeAll = (keys: string[], value: string) => { try { keys.forEach(k => localStorage.setItem(k, value)); } catch {} };
 
 const writeAll = (keys: string[], value: string) => {
   try { keys.forEach(k => localStorage.setItem(k, value)); } catch {}
