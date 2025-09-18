@@ -167,14 +167,48 @@ export default function KanbanPage() {
   const [calEnd, setCalEnd] = useState("10:00");
 
   // ลองดึงค่า default จาก localStorage
-  useEffect(() => {
+useEffect(() => {
+  (async () => {
+    const url = new URL(window.location.href);
+    const qsGid = url.searchParams.get("group_id");
+    const qsKey = url.searchParams.get("key");
+
+    // 1) จาก URL มาก่อน (ถ้ามี)
+    if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
+    if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
+
+    // 2) ถ้าไม่มีใน URL → ลองอ่านจาก localStorage (ทุกชื่อที่รองรับ)
+    if (!qsGid) {
+      const lsGid = readFirst(GID_KEYS);
+      if (lsGid) setGroupId(lsGid);
+    }
+    if (!qsKey) {
+      const lsKey = readFirst(KEY_KEYS);
+      if (lsKey) setAdminKey(lsKey);
+    }
+
+    // 3) กรณีเปิดใน LIFF group และยังไม่มี groupId
     try {
-      const gid = localStorage.getItem("liff_group_id") || localStorage.getItem("LS_GID") || "";
-      const key = localStorage.getItem("admin_key") || localStorage.getItem("ADMIN_KEY") || "";
-      if (gid) setGroupId(gid);
-      if (key) setAdminKey(key);
+      const liff: any = (window as any).liff;
+      if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
+        if (!liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+        if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
+        const ctx = liff?.getContext?.();
+        if (ctx?.type === "group" && ctx.groupId) {
+          setGroupId(ctx.groupId);
+          writeAll(GID_KEYS, ctx.groupId);
+        }
+      }
     } catch {}
-  }, []);
+
+    // ถ้ามี query เราอาจล้างทิ้งเพื่อความปลอดภัย (ไม่บังคับ)
+    // url.search = "";
+    // history.replaceState(null, "", url.toString());
+
+    setReady?.(true); // ถ้าหน้านั้นมี state ready
+  })();
+}, []);
+
 
   const columns = useMemo(() => {
     const map: Record<Status, Task[]> = { todo: [], in_progress: [], blocked: [], done: [], cancelled: [] };
