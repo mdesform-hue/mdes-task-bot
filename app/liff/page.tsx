@@ -26,18 +26,15 @@ const LS_KEY = "taskbot_key";
 const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]; // เริ่ม จันทร์
 
 
-const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];       // groupId
-const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];        // adminKey
+// keys กลาง + สำรอง (ให้สองหน้าคุยกันรู้เรื่อง)
+const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];  // groupId
+const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];   // adminKey
 
 const readFirst = (keys: string[]): string => {
-  try {
-    for (const k of keys) {
-      const v = localStorage.getItem(k);
-      if (v) return v;
-    }
-  } catch {}
+  try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
   return "";
 };
+const writeAll = (keys: string[], value: string) => { try { keys.forEach(k => localStorage.setItem(k, value)); } catch {} };
 
 const writeAll = (keys: string[], value: string) => {
   try { keys.forEach(k => localStorage.setItem(k, value)); } catch {}
@@ -80,16 +77,17 @@ export default function LiffAdminPage() {
   });
 
   // ========= init: URL -> localStorage -> LIFF context =========
-  useEffect(() => {
+useEffect(() => {
   (async () => {
     const url = new URL(window.location.href);
     const qsGid = url.searchParams.get("group_id");
     const qsKey = url.searchParams.get("key");
-    
+
+    // 1) จาก URL มาก่อน
     if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
     if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
 
-    
+    // 2) ถ้าไม่มีใน URL → ลอง localStorage
     if (!qsGid) {
       const lsGid = readFirst(GID_KEYS);
       if (lsGid) setGroupId(lsGid);
@@ -97,11 +95,13 @@ export default function LiffAdminPage() {
     if (!qsKey) {
       const lsKey = readFirst(KEY_KEYS);
       if (lsKey) setAdminKey(lsKey);
-    } 
+    }
+
+    // 3) ถ้ายังไม่มี groupId → ใช้ LIFF context (เฉพาะเปิดใน LINE)
     try {
       const liff: any = (window as any).liff;
-      if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
-        if (!liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+      if (!readFirst(GID_KEYS) && process.env.NEXT_PUBLIC_LIFF_ID) {
+        if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
         if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
         const ctx = liff?.getContext?.();
         if (ctx?.type === "group" && ctx.groupId) {
@@ -110,7 +110,8 @@ export default function LiffAdminPage() {
         }
       }
     } catch {}
-    setReady?.(true); 
+
+    setReady(true);
   })();
 }, []);
 
@@ -188,8 +189,8 @@ export default function LiffAdminPage() {
     await load();
   };
 
-  const saveGid = () => { localStorage.setItem(LS_GID, groupId); setEditGid(false); load(); };
-  const saveKey = () => { localStorage.setItem(LS_KEY, adminKey); setEditKey(false); load(); };
+const saveGid = () => { writeAll(GID_KEYS, groupId); setEditGid(false); load(); };
+const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load(); };
   const copyLink = () => {
     const u = new URL(location.href);
     u.searchParams.set("key", adminKey || "");
@@ -271,11 +272,17 @@ export default function LiffAdminPage() {
           <div className="flex gap-2">
             <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
             <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>Reload</button>
-            <button className="bg-gray-700 text-white px-3 py-3 md:py-2 rounded" onClick={() => { const u=new URL(location.href); u.searchParams.set("key",adminKey||""); if(groupId)u.searchParams.set("group_id",groupId); navigator.clipboard.writeText(u.toString()); alert("คัดลอกลิงก์แล้ว"); }}>Copy</button>
-            {/* Duplicate link in toolbar for visibility */}
-            <Link href="/liff/kanban" className="px-3 py-3 md:py-2 rounded bg-indigo-600 text-white">
-              Kanban
-            </Link>
+         <button
+  className="w-full bg-indigo-600 text-white px-3 py-3 md:py-2 rounded"
+  onClick={() => {
+    const url = new URL("/liff/kanban", location.origin);
+    if (groupId) url.searchParams.set("group_id", groupId);
+    if (adminKey) url.searchParams.set("key", adminKey);
+    window.open(url.toString(), "_self"); // เปิดหน้าเดิม ไม่เด้งแท็บใหม่
+  }}
+>
+  เปิด Kanban
+</button>
           </div>
         </div>
       </div>
