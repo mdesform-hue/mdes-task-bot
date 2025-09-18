@@ -105,7 +105,7 @@ useEffect(() => {
     const ctx = liff?.getContext?.();
     // console.log("LIFF ctx =", ctx);
     // ถ้าทดสอบบนมือถือ อยากให้เห็นทันที
-      alert("ctx: " + JSON.stringify(ctx));
+     // alert("ctx: " + JSON.stringify(ctx));
     if (ctx?.type === "group" && ctx.groupId) {
       setGroupId(ctx.groupId);
       writeAll(GID_KEYS, ctx.groupId);
