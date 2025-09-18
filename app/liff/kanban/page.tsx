@@ -47,6 +47,26 @@ const STATUS_RING: Record<Status, string> = {
   cancelled: "ring-zinc-300/50",
 };
 
+const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];       // groupId
+const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];        // adminKey
+
+const readFirst = (keys: string[]): string => {
+  try {
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      if (v) return v;
+    }
+  } catch {}
+  return "";
+};
+
+const writeAll = (keys: string[], value: string) => {
+  try { keys.forEach(k => localStorage.setItem(k, value)); } catch {}
+};
+
+const removeAll = (keys: string[]) => {
+  try { keys.forEach(k => localStorage.removeItem(k)); } catch {}
+};
 function fmtDate(v?: string | null) {
   if (!v) return "";
   try {
