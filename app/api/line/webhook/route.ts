@@ -274,7 +274,7 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // ---- list / list today ----
+    // ---- list / list today ----asd
     if (/^list(\s+today)?$/i.test(text) || /^รายการ/i.test(text)) {
       const onlyToday = /today/i.test(text);
       const rows = onlyToday
