@@ -237,8 +237,12 @@ const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load();
   const parseTags = (s: string) => s.split(",").map(x=>x.trim()).filter(Boolean);
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
+ <div className="p-4">
+      {/* โหลด LIFF SDK ของ LINE */}
+      <Script 
+        src="https://static.line-scdn.net/liff/edge/2/sdk.js" 
+        strategy="afterInteractive" 
+      />
 
       {/* Header + Link to Kanban */}
       <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
