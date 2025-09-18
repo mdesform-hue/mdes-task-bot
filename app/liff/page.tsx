@@ -103,9 +103,9 @@ useEffect(() => {
     if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
     if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
     const ctx = liff?.getContext?.();
-    console.log("LIFF ctx =", ctx);
+    // console.log("LIFF ctx =", ctx);
     // ถ้าทดสอบบนมือถือ อยากให้เห็นทันที
-    // alert("ctx: " + JSON.stringify(ctx));
+      alert("ctx: " + JSON.stringify(ctx));
     if (ctx?.type === "group" && ctx.groupId) {
       setGroupId(ctx.groupId);
       writeAll(GID_KEYS, ctx.groupId);
