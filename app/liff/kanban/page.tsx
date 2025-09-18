@@ -405,6 +405,17 @@ useEffect(() => {
           >
             {loading ? "กำลังโหลด..." : "รีเฟรช"}
           </button>
+          <button
+  className="bg-indigo-600 text-white px-3 py-3 md:py-2 rounded"
+  onClick={() => {
+    const url = new URL("/liff", location.origin);
+    if (groupId) url.searchParams.set("group_id", groupId);
+    if (adminKey) url.searchParams.set("key", adminKey);
+    window.open(url.toString(), "_blank"); // เปิดแท็บใหม่ (หรือจะใช้ _self แทนก็ได้)
+  }}
+>
+  เปิด Home
+</button>
         </div>
 
         {/* Columns */}
