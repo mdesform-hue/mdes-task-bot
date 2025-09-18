@@ -411,7 +411,7 @@ useEffect(() => {
     const url = new URL("/liff", location.origin);
     if (groupId) url.searchParams.set("group_id", groupId);
     if (adminKey) url.searchParams.set("key", adminKey);
-    window.open(url.toString(), "_blank"); // เปิดแท็บใหม่ (หรือจะใช้ _self แทนก็ได้)
+    window.open(url.toString(), "_self"); // เปิดแท็บใหม่ (หรือจะใช้ _self แทนก็ได้)
   }}
 >
   เปิด Home
