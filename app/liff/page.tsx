@@ -242,15 +242,6 @@ export default function LiffAdminPage() {
       {/* Header + Link to Kanban */}
       <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <h1 className="text-xl md:text-2xl font-semibold">LIFF Admin — Tasks</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/liff/kanban"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-gradient-to-r from-indigo-600 to-sky-500 text-white shadow-sm hover:shadow-md active:scale-[.98]"
-          >
-            เปิด Kanban View
-            <span aria-hidden>↗</span>
-          </Link>
-        </div>
       </div>
 
       {/* ===== Toolbar ===== */}
