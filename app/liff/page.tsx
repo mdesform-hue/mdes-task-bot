@@ -25,6 +25,28 @@ const LS_GID = "taskbot_gid";
 const LS_KEY = "taskbot_key";
 const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]; // เริ่ม จันทร์
 
+
+const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];       // groupId
+const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];        // adminKey
+
+const readFirst = (keys: string[]): string => {
+  try {
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      if (v) return v;
+    }
+  } catch {}
+  return "";
+};
+
+const writeAll = (keys: string[], value: string) => {
+  try { keys.forEach(k => localStorage.setItem(k, value)); } catch {}
+};
+
+const removeAll = (keys: string[]) => {
+  try { keys.forEach(k => localStorage.removeItem(k)); } catch {}
+};
+
 export default function LiffAdminPage() {
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
