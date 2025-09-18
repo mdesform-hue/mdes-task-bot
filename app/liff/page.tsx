@@ -97,18 +97,23 @@ useEffect(() => {
     }
 
     // 3) ถ้ายังไม่มี groupId → ใช้ LIFF context (เฉพาะเปิดใน LINE)
-    try {
-      const lsGid = readFirst(GID_KEYS);
-      if (!qsGid && !lsGid && process.env.NEXT_PUBLIC_LIFF_ID) {
-        if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
-        if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
-        const ctx = liff?.getContext?.();
-        if (ctx?.type === "group" && ctx.groupId) {
-          setGroupId(ctx.groupId);
-          writeAll(GID_KEYS, ctx.groupId);
-        }
-      }
-    } catch {}
+  try {
+  const liff: any = (window as any).liff;
+  if (process.env.NEXT_PUBLIC_LIFF_ID) {
+    if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+    if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
+    const ctx = liff?.getContext?.();
+    console.log("LIFF ctx =", ctx);
+    // ถ้าทดสอบบนมือถือ อยากให้เห็นทันที
+    // alert("ctx: " + JSON.stringify(ctx));
+    if (ctx?.type === "group" && ctx.groupId) {
+      setGroupId(ctx.groupId);
+      writeAll(GID_KEYS, ctx.groupId);
+    }
+  }
+} catch (e) {
+  console.error("LIFF init error", e);
+}
 
     setReady(true);
   })();
