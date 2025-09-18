@@ -414,7 +414,7 @@ useEffect(() => {
     window.open(url.toString(), "_self"); // เปิดแท็บใหม่ (หรือจะใช้ _self แทนก็ได้)
   }}
 >
-  เปิด Home
+  LIFF TASK
 </button>
         </div>
 
