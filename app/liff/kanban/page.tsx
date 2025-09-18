@@ -200,8 +200,6 @@ useEffect(() => {
         }
       }
     } catch {}
-
-    setReady?.(true); // ถ้าหน้านั้นมี state ready
   })();
 }, []);
 
