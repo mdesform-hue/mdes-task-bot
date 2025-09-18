@@ -19,10 +19,8 @@ function hasScheduleKeyword(text: string) {
 
 function extractEmails(text: string): string[] {
   const picked = new Set<string>();
-  // email=someone@domain
   const p = /email\s*=\s*([^\s|,;]+)/i.exec(text)?.[1];
   if (p) picked.add(p);
-  // อีเมลที่โผล่ในประโยค
   for (const m of text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)) {
     picked.add(m[0]);
   }
@@ -35,56 +33,127 @@ function extractTitle(raw: string) {
   return t;
 }
 
-// คืนช่วงเวลา 60 นาที ถ้าตีความได้ (ระวังโซนเวลาให้เป็น Bangkok ตั้งแต่ต้น)
-function parseThaiDate(text: string): { startISO: string; endISO: string } | null {
+type ParsedWhen =
+  | { kind: "timed"; startISO: string; endISO: string }
+  | { kind: "allday"; startDate: string; endDate: string };
+
+// สร้าง Date ไทยง่าย ๆ
+const pad2 = (n: number) => String(n).padStart(2, "0");
+function bkkToday() {
   const now = new Date();
-  const bkkNow = new Date(now.toLocaleString("en-US", { timeZone: TZ }));
+  return new Date(now.toLocaleString("en-US", { timeZone: TZ }));
+}
+function ymdFrom(date: Date) {
+  return {
+    y: date.getFullYear(),
+    m: date.getMonth() + 1,
+    d: date.getDate(),
+  };
+}
+function isoStartAtThai(y: number, m: number, d: number, hh = 0, mm = 0) {
+  return new Date(`${y}-${pad2(m)}-${pad2(d)}T${pad2(hh)}:${pad2(mm)}:00+07:00`);
+}
 
-  // พรุ่งนี้ HH โมง  (แก้ให้สร้างเป็นเวลาพร้อม +07:00)
-  let m = text.match(/พรุ่งนี้\s*(\d{1,2})\s*โมง/i);
-  if (m) {
-    const hh = Math.max(0, Math.min(23, parseInt(m[1], 10)));
+// คืนช่วงเวลา 60 นาที / หรือ all-day ถ้าตีความได้
+function parseThaiDate(text: string): ParsedWhen | null {
+  const base = bkkToday();
+  const { y, m, d } = ymdFrom(base);
 
-    // ใช้วันที่ "พรุ่งนี้" อ้างอิงจากเวลาโซนกรุงเทพ
-    const bkkBase = new Date(bkkNow);
-    bkkBase.setDate(bkkBase.getDate() + 1);
-
-    const y  = bkkBase.getFullYear();
-    const mo = bkkBase.getMonth() + 1; // 1-12
-    const dd = bkkBase.getDate();
-
-    const pad = (n: number) => String(n).padStart(2, "0");
-
-    // ระบุโซนเวลาไทยชัดเจนตั้งแต่ต้น
-    const start = new Date(`${y}-${pad(mo)}-${pad(dd)}T${pad(hh)}:00:00+07:00`);
-    const end   = new Date(start.getTime() + 60 * 60 * 1000);
-    return { startISO: start.toISOString(), endISO: end.toISOString() };
+  // --- 1) TODAY / พูดคำว่าวันนี้ ---
+  // วันนี้ ทั้งวัน
+  if (/\bวันนี้\b.*\bทั้งวัน\b|\bทั้งวัน\b.*\bวันนี้\b/i.test(text)) {
+    const startDate = `${y}-${pad2(m)}-${pad2(d)}`;
+    const end = new Date(base); end.setDate(end.getDate() + 1);
+    const { y: y2, m: m2, d: d2 } = ymdFrom(end);
+    const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+    return { kind: "allday", startDate, endDate };
   }
-
-  // <วันที่เดือนนี้> HH โมง  เช่น "27 10 โมง"
-  m = text.match(/\b(\d{1,2})\s+(\d{1,2})\s*โมง\b/);
-  if (m) {
-    const dd = Math.max(1, Math.min(31, parseInt(m[1], 10)));
-    const hh = Math.max(0, Math.min(23, parseInt(m[2], 10)));
-    const y = bkkNow.getFullYear();
-    const mo = bkkNow.getMonth() + 1; // เดือนนี้ (1-12)
-    const pad = (n: number) => String(n).padStart(2, "0");
-    // สร้างเวลาแบบไทยแล้วแปลงเป็น ISO
-    const start = new Date(`${y}-${pad(mo)}-${pad(dd)}T${pad(hh)}:00:00+07:00`);
+  // วันนี้ HH โมง
+  let mTodayTime = text.match(/\bวันนี้\b.*?(\d{1,2})\s*โมง/i);
+  if (mTodayTime) {
+    const hh = Math.max(0, Math.min(23, parseInt(mTodayTime[1], 10)));
+    const start = isoStartAtThai(y, m, d, hh, 0);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
-    return { startISO: start.toISOString(), endISO: end.toISOString() };
+    return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
+  }
+  // แค่ "วันนี้" เฉย ๆ → all-day
+  if (/\bวันนี้\b/i.test(text)) {
+    const startDate = `${y}-${pad2(m)}-${pad2(d)}`;
+    const end = new Date(base); end.setDate(end.getDate() + 1);
+    const { y: y2, m: m2, d: d2 } = ymdFrom(end);
+    const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+    return { kind: "allday", startDate, endDate };
   }
 
-  // รูปแบบชัดเจน: due=YYYY-MM-DD | time=HH:MM
+  // --- 2) พรุ่งนี้ / มะรืน ---
+  // พรุ่งนี้ ทั้งวัน
+  if (/\bพรุ่งนี้\b.*\bทั้งวัน\b|\bทั้งวัน\b.*\bพรุ่งนี้\b/i.test(text)) {
+    const tmr = new Date(base); tmr.setDate(tmr.getDate() + 1);
+    const { y: y1, m: m1, d: d1 } = ymdFrom(tmr);
+    const startDate = `${y1}-${pad2(m1)}-${pad2(d1)}`;
+    const end = new Date(tmr); end.setDate(end.getDate() + 1);
+    const { y: y2, m: m2, d: d2 } = ymdFrom(end);
+    const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+    return { kind: "allday", startDate, endDate };
+  }
+  // พรุ่งนี้ HH โมง (แก้ timezone ให้ถูกต้อง)
+  let mTmr = text.match(/พรุ่งนี้\s*(\d{1,2})\s*โมง/i);
+  if (mTmr) {
+    const hh = Math.max(0, Math.min(23, parseInt(mTmr[1], 10)));
+    const tmr = new Date(base); tmr.setDate(tmr.getDate() + 1);
+    const { y: y1, m: m1, d: d1 } = ymdFrom(tmr);
+    const start = isoStartAtThai(y1, m1, d1, hh, 0);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
+  }
+  // แค่ "พรุ่งนี้" → all-day
+  if (/\bพรุ่งนี้\b/i.test(text)) {
+    const tmr = new Date(base); tmr.setDate(tmr.getDate() + 1);
+    const { y: y1, m: m1, d: d1 } = ymdFrom(tmr);
+    const startDate = `${y1}-${pad2(m1)}-${pad2(d1)}`;
+    const end = new Date(tmr); end.setDate(end.getDate() + 1);
+    const { y: y2, m: m2, d: d2 } = ymdFrom(end);
+    const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+    return { kind: "allday", startDate, endDate };
+  }
+
+  // --- 3) รูปแบบ: "<วันที่เดือนนี้> HH โมง" เช่น "27 10 โมง"
+  let mDayTime = text.match(/\b(\d{1,2})\s+(\d{1,2})\s*โมง\b/);
+  if (mDayTime) {
+    const dd = Math.max(1, Math.min(31, parseInt(mDayTime[1], 10)));
+    const hh = Math.max(0, Math.min(23, parseInt(mDayTime[2], 10)));
+    const start = isoStartAtThai(y, m, dd, hh, 0);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
+  }
+  // "<วันที่เดือนนี้> ทั้งวัน" เช่น "27 ทั้งวัน"
+  let mDayAll = text.match(/\b(\d{1,2})\s*ทั้งวัน\b/);
+  if (mDayAll) {
+    const dd = Math.max(1, Math.min(31, parseInt(mDayAll[1], 10)));
+    const startDate = `${y}-${pad2(m)}-${pad2(dd)}`;
+    const endDateObj = new Date(isoStartAtThai(y, m, dd, 0, 0));
+    endDateObj.setDate(endDateObj.getDate() + 1);
+    const { y: y2, m: m2, d: d2 } = ymdFrom(new Date(endDateObj.toLocaleString("en-US", { timeZone: TZ })));
+    const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+    return { kind: "allday", startDate, endDate };
+  }
+
+  // --- 4) due=YYYY-MM-DD | time=HH:MM ---
   const due = /due=(\d{4}-\d{2}-\d{2})/i.exec(text)?.[1];
   const tim = /time=(\d{1,2}):(\d{2})/i.exec(text);
-  if (due) {
-    const hh = tim ? Number(tim[1]) : 9;
-    const mm = tim ? Number(tim[2]) : 0;
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const start = new Date(`${due}T${pad(hh)}:${pad(mm)}:00+07:00`);
+  if (due && tim) {
+    const hh = Number(tim[1]), mm = Number(tim[2]);
+    const start = new Date(`${due}T${pad2(hh)}:${pad2(mm)}:00+07:00`);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
-    return { startISO: start.toISOString(), endISO: end.toISOString() };
+    return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
+  } else if (due && !tim) {
+    // ไม่มี time → ถือเป็น all-day
+    const startDate = due;
+    const endObj = new Date(`${due}T00:00:00+07:00`);
+    endObj.setDate(endObj.getDate() + 1);
+    const { y: y2, m: m2, d: d2 } = ymdFrom(new Date(endObj.toLocaleString("en-US", { timeZone: TZ })));
+    const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+    return { kind: "allday", startDate, endDate };
   }
 
   return null;
@@ -95,6 +164,13 @@ function fmtDate(d: string | Date) {
   return new Intl.DateTimeFormat("th-TH", {
     timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit"
+  }).format(dt);
+}
+function fmtThaiDateOnly(dateStr: string) {
+  // dateStr = YYYY-MM-DD
+  const dt = new Date(`${dateStr}T00:00:00+07:00`);
+  return new Intl.DateTimeFormat("th-TH", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit"
   }).format(dt);
 }
 
@@ -112,9 +188,9 @@ async function reply(replyToken: string, message: any) {
 function helpText(gid?: string) {
   const lines = [
     "🧭 คำสั่งที่ใช้ได้:",
-    "• ai ลงตาราง <เรื่อง> พรุ่งนี้ 10 โมง | 27 10 โมง | due=YYYY-MM-DD time=HH:MM | email=a@b.com",
+    "• ai ลงตาราง <เรื่อง> วันนี้ | วันนี้ 10 โมง | พรุ่งนี้ 10 โมง | พรุ่งนี้ (ทั้งวัน) | 27 10 โมง | 27 ทั้งวัน | due=YYYY-MM-DD [time=HH:MM] | email=a@b.com",
     "   - ถ้าไม่ใส่ 'ลงตาราง' จะสร้างเป็นงาน (Task) อย่างเดียว",
-    "• add ชืองาน | desc=รายละเอียด | due=YYYY-MM-DD",
+    "• add ชื่องาน | desc=รายละเอียด | due=YYYY-MM-DD",
     "• list — แสดงรายการงาน",
     "• list today — เฉพาะงานวันนี้",
     "• progress <code> <เปอร์เซ็นต์ หรือ +10/-5>",
@@ -148,12 +224,17 @@ export async function POST(req: Request) {
       try {
         const wantCalendar = hasScheduleKeyword(text);
         const emails = extractEmails(text);
-        const when = parseThaiDate(text); // อาจได้หรือไม่ได้
+        const when = parseThaiDate(text); // อาจคืน timed หรือ allday หรือ null
 
         const titleRaw = extractTitle(text);
         const title = titleRaw
-          .replace(/พรุ่งนี้\s*\d{1,2}\s*โมง/i, "")
-          .replace(/\b\d{1,2}\s+\d{1,2}\s*โมง\b/, "")
+          // ตัดคำที่เกี่ยวกับเวลาออกจากชื่อเรื่อง
+          .replace(/\bวันนี้\b/gi, "")
+          .replace(/\bพรุ่งนี้\b/gi, "")
+          .replace(/\bทั้งวัน\b/gi, "")
+          .replace(/พรุ่งนี้\s*\d{1,2}\s*โมง/gi, "")
+          .replace(/\b\d{1,2}\s+\d{1,2}\s*โมง\b/gi, "")
+          .replace(/วันนี้\s*\d{1,2}\s*โมง/gi, "")
           .replace(/due=\d{4}-\d{2}-\d{2}/i, "")
           .replace(/time=\d{1,2}:\d{2}/i, "")
           .replace(/email=[^\s|,;]+/i, "")
@@ -165,55 +246,95 @@ export async function POST(req: Request) {
           insert into public.groups (id) values (${groupId})
           on conflict (id) do nothing`;
 
-        // ถ้ามี "ลงตาราง" และตีความเวลาได้ → Calendar + Task
+        // ---- ลง Calendar + Task (ถ้าระบุ "ลงตาราง" และตีความเวลาได้) ----
         if (wantCalendar && when) {
+          // เตรียมข้อมูลเพื่อบันทึก Task
+          let dueAtISO: string | null = null;
+          let descNote = `สร้างจาก LINE group ${groupId}`;
+          let calendarMsg = "";
+
+          if (when.kind === "timed") {
+            dueAtISO = when.startISO;
+            calendarMsg = `• เวลา: ${fmtDate(when.startISO)} - ${fmtDate(when.endISO)}`;
+            // เรียก calendar (timed)
+            await createCalendarEvent({
+              title,
+              startISO: when.startISO,
+              endISO: when.endISO,
+              attendees: emails,
+              description: `${descNote}`,
+            } as any);
+          } else {
+            // all-day: ใช้ต้นวันเป็น due_at ไว้เรียง/list และใส่ note
+            dueAtISO = new Date(`${when.startDate}T00:00:00+07:00`).toISOString();
+            descNote = `[ALL_DAY] ${descNote}`;
+            calendarMsg = when.startDate === when.endDate
+              ? `• เวลา: ทั้งวัน ${fmtThaiDateOnly(when.startDate)}`
+              : `• เวลา: ทั้งวัน ${fmtThaiDateOnly(when.startDate)} - ${fmtThaiDateOnly(when.endDate)}`;
+            // เรียก calendar (all-day)
+            await createCalendarEvent({
+              title,
+              allDay: true,
+              startDate: when.startDate,
+              endDate: when.endDate,
+              attendees: emails,
+              description: `${descNote}`,
+            } as any);
+          }
+
           const ins = await sql/* sql */`
             insert into public.tasks (group_id, code, title, description, due_at)
             values (
               ${groupId},
               lpad((floor(random()*10000))::text, 4, '0'),
               ${title},
-              ${null},
-              ${when.startISO}
+              ${descNote},
+              ${dueAtISO}
             )
             returning code`;
 
-          await createCalendarEvent({
-            title,
-            startISO: when.startISO,
-            endISO: when.endISO,
-            attendees: emails,
-            description: `สร้างจาก LINE group ${groupId} / task code=${ins[0].code}`,
-          });
-
           await reply(ev.replyToken, {
             type: "text",
-            text: `📅 ลงตารางแล้ว\n• เรื่อง: ${title}\n• เวลา: ${fmtDate(when.startISO)} - ${fmtDate(when.endISO)}${emails.length ? `\n• เชิญ: ${emails.join(", ")}` : ""}`
+            text:
+              `📅 ลงตารางแล้ว\n` +
+              `• เรื่อง: ${title}\n` +
+              `${calendarMsg}` +
+              (emails.length ? `\n• เชิญ: ${emails.join(", ")}` : "") +
+              `\n• code: ${ins[0].code}`
           });
           continue;
         }
 
-        // ไม่ลงตาราง → แค่สร้าง Task (มี due ถ้าตีความได้)
-        const dueISO = when?.startISO ?? null;
-        let code = Math.floor(Math.random()*10000).toString().padStart(4,"0");
+        // ---- ไม่ลงตาราง → แค่สร้าง Task (มี due ถ้าตีความได้) ----
+        let dueISO: string | null = null;
+        let descForTask: string | null = null;
+        if (when?.kind === "timed") {
+          dueISO = when.startISO;
+        } else if (when?.kind === "allday") {
+          dueISO = new Date(`${when.startDate}T00:00:00+07:00`).toISOString();
+          descForTask = "[ALL_DAY]";
+        }
+
+        const genCode4 = () => Math.floor(Math.random()*10000).toString().padStart(4,"0");
+        let code = genCode4();
         let created: any[] = [];
         for (let i = 0; i < 25; i++) {
           try {
             created = await sql/* sql */`
               insert into public.tasks (group_id, code, title, description, due_at)
-              values (${groupId}, ${code}, ${title}, ${null}, ${dueISO})
+              values (${groupId}, ${code}, ${title}, ${descForTask}, ${dueISO})
               returning code, title, due_at`;
             break;
           } catch (e:any) {
             const msg = String(e?.message ?? e);
-            if (msg.includes("duplicate key")) { code = Math.floor(Math.random()*10000).toString().padStart(4,"0"); continue; }
+            if (msg.includes("duplicate key")) { code = genCode4(); continue; }
             throw e;
           }
         }
         const r = created[0];
         await reply(ev.replyToken, {
           type: "text",
-          text: `🆕 เพิ่มงานแล้ว\n• CODE: ${r.code}\n• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}`
+          text: `🆕 เพิ่มงานแล้ว\n• CODE: ${r.code}\n• เรื่อง: ${r.title}${r.due_at ? `\n• กำหนด: ${fmtDate(r.due_at)}` : ""}${descForTask ? `\n• หมายเหตุ: ${descForTask}` : ""}`
         });
       } catch (e:any) {
         console.error("AI_INTENT_ERR", e);
