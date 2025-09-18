@@ -173,11 +173,11 @@ useEffect(() => {
     const qsGid = url.searchParams.get("group_id");
     const qsKey = url.searchParams.get("key");
 
-    // 1) จาก URL มาก่อน (ถ้ามี)
+   
     if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
     if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
 
-    // 2) ถ้าไม่มีใน URL → ลองอ่านจาก localStorage (ทุกชื่อที่รองรับ)
+   
     if (!qsGid) {
       const lsGid = readFirst(GID_KEYS);
       if (lsGid) setGroupId(lsGid);
@@ -187,7 +187,7 @@ useEffect(() => {
       if (lsKey) setAdminKey(lsKey);
     }
 
-    // 3) กรณีเปิดใน LIFF group และยังไม่มี groupId
+    
     try {
       const liff: any = (window as any).liff;
       if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
@@ -200,10 +200,6 @@ useEffect(() => {
         }
       }
     } catch {}
-
-    // ถ้ามี query เราอาจล้างทิ้งเพื่อความปลอดภัย (ไม่บังคับ)
-    // url.search = "";
-    // history.replaceState(null, "", url.toString());
 
     setReady?.(true); // ถ้าหน้านั้นมี state ready
   })();
