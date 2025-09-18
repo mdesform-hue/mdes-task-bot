@@ -81,36 +81,38 @@ export default function LiffAdminPage() {
 
   // ========= init: URL -> localStorage -> LIFF context =========
   useEffect(() => {
-    (async () => {
-      const url = new URL(window.location.href);
-      const qsGid = url.searchParams.get("group_id");
-      const qsKey = url.searchParams.get("key");
+  (async () => {
+    const url = new URL(window.location.href);
+    const qsGid = url.searchParams.get("group_id");
+    const qsKey = url.searchParams.get("key");
+    
+    if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
+    if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
 
-      const lsKey = localStorage.getItem(LS_KEY);
-      const lsGid = localStorage.getItem(LS_GID);
-
-      if (lsKey) setAdminKey(lsKey);
-      else if (qsKey) { setAdminKey(qsKey); localStorage.setItem(LS_KEY, qsKey); }
-
+    
+    if (!qsGid) {
+      const lsGid = readFirst(GID_KEYS);
       if (lsGid) setGroupId(lsGid);
-      else if (qsGid) { setGroupId(qsGid); localStorage.setItem(LS_GID, qsGid); }
-      else {
-        try {
-          const liff: any = (window as any).liff;
-          if (process.env.NEXT_PUBLIC_LIFF_ID) {
-            if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
-            if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
-            const ctx = liff?.getContext?.();
-            if (ctx?.type === "group" && ctx.groupId) {
-              setGroupId(ctx.groupId);
-              localStorage.setItem(LS_GID, ctx.groupId);
-            }
-          }
-        } catch {}
+    }
+    if (!qsKey) {
+      const lsKey = readFirst(KEY_KEYS);
+      if (lsKey) setAdminKey(lsKey);
+    } 
+    try {
+      const liff: any = (window as any).liff;
+      if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
+        if (!liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+        if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
+        const ctx = liff?.getContext?.();
+        if (ctx?.type === "group" && ctx.groupId) {
+          setGroupId(ctx.groupId);
+          writeAll(GID_KEYS, ctx.groupId);
+        }
       }
-      setReady(true);
-    })();
-  }, []);
+    } catch {}
+    setReady?.(true); 
+  })();
+}, []);
 
   const load = async () => {
     if (!groupId || !adminKey) return;
