@@ -443,7 +443,8 @@ export default function LiffAdminPage() {
           <table className="w-full border border-slate-200 rounded-md text-sm bg-white">
             <thead className="bg-slate-50">
               <tr>
-                <th className="p-2 text-center w-8 border-b border-slate-200 whitespace-nowrap w-[180px]">
+                <th className="p-2 text-center whitespace-nowrap w-[200px]">
+                  <div className="flex items-center justify-center gap-2">
                   <input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} />
                 </th>
                 <th className="p-2 text-left border-b border-slate-200">CODE</th>
@@ -455,6 +456,7 @@ export default function LiffAdminPage() {
                 <th className="p-2 border-b border-slate-200">Tags</th>
                 <th className="p-2 border-b border-slate-200">Progress</th>
                 <th className="p-2 border-b border-slate-200">Actions</th>
+                  </div>
               </tr>
             </thead>
             <tbody>
