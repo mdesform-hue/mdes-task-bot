@@ -255,7 +255,7 @@ export default function LiffAdminPage() {
         {/* Title */}
         <div className="mb-5 md:mb-7">
           <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Tasks</h1>
-          <p className="text-slate-600 text-sm">จัดการงานของกลุ่ม | โทนขาว–เขียว เรียบ สะอาดตา</p>
+          <p className="text-slate-600 text-sm">จัดการงานของกลุ่ม | </p>
         </div>
 
         {/* ===== Toolbar ===== */}
