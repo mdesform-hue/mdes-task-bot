@@ -241,14 +241,7 @@ const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load();
   const parseTags = (s: string) => s.split(",").map(x=>x.trim()).filter(Boolean);
 
   return (
- <div className="p-4">
-      {/* โหลด LIFF SDK ของ LINE */}
-      <Script 
-        src="https://static.line-scdn.net/liff/edge/2/sdk.js" 
-        strategy="afterInteractive" 
-      />
-
-
+    
     <div className="min-h-screen bg-white">
       {/* Global header (เรียบ/สะอาด) */}
       <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
@@ -262,6 +255,16 @@ const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load();
         </div>
       </header>
 
+<main className="mx-auto max-w-screen-xl px-4 py-6 md:py-8">
+        {/* โหลด LIFF SDK ของ LINE */}
+        <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
+
+        {/* Title */}
+        <div className="mb-5 md:mb-7">
+          <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Tasks</h1>
+          <p className="text-slate-600 text-sm">จัดการงานของกลุ่ม | โทนขาว–เขียว เรียบ สะอาดตา</p>
+        </div>
+  
       {/* ===== Toolbar ===== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-4">
         <div className="flex flex-col">
