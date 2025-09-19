@@ -4,6 +4,21 @@ import { useEffect, useState, useMemo } from "react";
 import Script from "next/script";
 import Link from "next/link";
 
+/** ---------- Theme helpers (green/clean) ---------- */
+const cn = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
+const btn = (variant: "primary" | "ghost" | "danger" | "neutral" = "primary") =>
+  ({
+    primary:
+      "inline-flex items-center justify-center px-3 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 border border-transparent transition",
+    ghost:
+      "inline-flex items-center justify-center px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-green-400 transition",
+    danger:
+      "inline-flex items-center justify-center px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
+    neutral:
+      "inline-flex items-center justify-center px-3 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-800 border border-transparent transition",
+  }[variant]);
+
+/** ---------- Types ---------- */
 type Task = {
   id: string;
   code: string;
@@ -25,7 +40,6 @@ const LS_GID = "taskbot_gid";
 const LS_KEY = "taskbot_key";
 const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]; // เริ่ม จันทร์
 
-
 // keys กลาง + สำรอง (ให้สองหน้าคุยกันรู้เรื่อง)
 const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];  // groupId
 const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];   // adminKey
@@ -34,11 +48,9 @@ const readFirst = (keys: string[]): string => {
   try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
   return "";
 };
-
 const writeAll = (keys: string[], value: string) => {
   try { keys.forEach(k => localStorage.setItem(k, value)); } catch {}
 };
-
 const removeAll = (keys: string[]) => {
   try { keys.forEach(k => localStorage.removeItem(k)); } catch {}
 };
@@ -76,48 +88,45 @@ export default function LiffAdminPage() {
   });
 
   // ========= init: URL -> localStorage -> LIFF context =========
-useEffect(() => {
-  (async () => {
-    const url = new URL(window.location.href);
-    const qsGid = url.searchParams.get("group_id");
-    const qsKey = url.searchParams.get("key");
+  useEffect(() => {
+    (async () => {
+      const url = new URL(window.location.href);
+      const qsGid = url.searchParams.get("group_id");
+      const qsKey = url.searchParams.get("key");
 
-    // 1) จาก URL มาก่อน
-    if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
-    if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
+      // 1) จาก URL มาก่อน
+      if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
+      if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
 
-    // 2) ถ้าไม่มีใน URL → ลอง localStorage
-    if (!qsGid) {
-      const lsGid = readFirst(GID_KEYS);
-      if (lsGid) setGroupId(lsGid);
-    }
-    if (!qsKey) {
-      const lsKey = readFirst(KEY_KEYS);
-      if (lsKey) setAdminKey(lsKey);
-    }
+      // 2) ถ้าไม่มีใน URL → ลอง localStorage
+      if (!qsGid) {
+        const lsGid = readFirst(GID_KEYS);
+        if (lsGid) setGroupId(lsGid);
+      }
+      if (!qsKey) {
+        const lsKey = readFirst(KEY_KEYS);
+        if (lsKey) setAdminKey(lsKey);
+      }
 
-    // 3) ถ้ายังไม่มี groupId → ใช้ LIFF context (เฉพาะเปิดใน LINE)
-  try {
-  const liff: any = (window as any).liff;
-  if (process.env.NEXT_PUBLIC_LIFF_ID) {
-    if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
-    if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
-    const ctx = liff?.getContext?.();
-    // console.log("LIFF ctx =", ctx);
-    // ถ้าทดสอบบนมือถือ อยากให้เห็นทันที
-     // alert("ctx: " + JSON.stringify(ctx));
-    if (ctx?.type === "group" && ctx.groupId) {
-      setGroupId(ctx.groupId);
-      writeAll(GID_KEYS, ctx.groupId);
-    }
-  }
-} catch (e) {
-  console.error("LIFF init error", e);
-}
+      // 3) ถ้ายังไม่มี groupId → ใช้ LIFF context (เฉพาะเปิดใน LINE)
+      try {
+        const liff: any = (window as any).liff;
+        if (process.env.NEXT_PUBLIC_LIFF_ID) {
+          if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+          if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
+          const ctx = liff?.getContext?.();
+          if (ctx?.type === "group" && ctx.groupId) {
+            setGroupId(ctx.groupId);
+            writeAll(GID_KEYS, ctx.groupId);
+          }
+        }
+      } catch (e) {
+        console.error("LIFF init error", e);
+      }
 
-    setReady(true);
-  })();
-}, []);
+      setReady(true);
+    })();
+  }, []);
 
   const load = async () => {
     if (!groupId || !adminKey) return;
@@ -193,8 +202,8 @@ useEffect(() => {
     await load();
   };
 
-const saveGid = () => { writeAll(GID_KEYS, groupId); setEditGid(false); load(); };
-const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load(); };
+  const saveGid = () => { writeAll(GID_KEYS, groupId); setEditGid(false); load(); };
+  const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load(); };
   const copyLink = () => {
     const u = new URL(location.href);
     u.searchParams.set("key", adminKey || "");
@@ -241,319 +250,342 @@ const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load();
   const parseTags = (s: string) => s.split(",").map(x=>x.trim()).filter(Boolean);
 
   return (
- <div className="p-4">
-      {/* โหลด LIFF SDK ของ LINE */}
-      <Script 
-        src="https://static.line-scdn.net/liff/edge/2/sdk.js" 
-        strategy="afterInteractive" 
-      />
+    <div className="min-h-screen bg-white">
+      {/* Global header (เรียบ/สะอาด) */}
+      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
+        <div className="mx-auto max-w-screen-xl px-4 h-14 flex items-center gap-4">
+          <div className="font-semibold text-slate-800">mdes-task-bot — LIFF Admin</div>
+          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600">
+            <a className="hover:text-slate-900" href="/liff">Tasks</a>
+            <a className="hover:text-slate-900" href="/liff/kanban">Kanban</a>
+          </nav>
+          <a href="/liff/kanban" className={btn("primary") + " md:hidden ml-auto"}>Kanban</a>
+        </div>
+      </header>
 
-      {/* Header + Link to Kanban */}
-      <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <h1 className="text-xl md:text-2xl font-semibold">LIFF Admin — Tasks</h1>
-      </div>
+      <main className="mx-auto max-w-screen-xl px-4 py-6 md:py-8">
+        {/* โหลด LIFF SDK ของ LINE */}
+        <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
 
-      {/* ===== Toolbar ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-4">
-        <div className="flex flex-col">
-          <label className="text-sm mb-1">Group ID</label>
-          <div className="flex gap-2">
-            <input className="border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100" value={groupId} disabled={!editGid} onChange={e=>setGroupId(e.target.value)} />
-            {!editGid
-              ? <button className="px-3 py-3 md:py-2 rounded border" onClick={()=>setEditGid(true)}>เปลี่ยน</button>
-              : <button className="px-3 py-3 md:py-2 rounded bg-blue-600 text-white" onClick={saveGid}>บันทึก</button>}
-          </div>
+        {/* Title */}
+        <div className="mb-5 md:mb-7">
+          <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Tasks</h1>
+          <p className="text-slate-600 text-sm">จัดการงานของกลุ่ม | โทนขาว–เขียว เรียบ สะอาดตา</p>
         </div>
 
-        <div className="flex flex-col">
-          <label className="text-sm mb-1">Admin Key</label>
-          <div className="flex gap-2">
-            <input className="border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100" value={adminKey} disabled={!editKey} onChange={e=>setAdminKey(e.target.value)} />
-            {!editKey
-              ? <button className="px-3 py-3 md:py-2 rounded border" onClick={()=>setEditKey(true)}>เปลี่ยน</button>
-              : <button className="px-3 py-3 md:py-2 rounded bg-blue-600 text-white" onClick={saveKey}>บันทึก</button>}
-          </div>
-        </div>
-
-        <div className="flex flex-col">
-          <label className="text-sm mb-1">ค้นหา</label>
-          <div className="flex gap-2">
-            <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
-            <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>Reload</button>
-         <button
-  className="w-full bg-indigo-600 text-white px-3 py-3 md:py-2 rounded"
-  onClick={() => {
-    const url = new URL("/liff/kanban", location.origin);
-    if (groupId) url.searchParams.set("group_id", groupId);
-    if (adminKey) url.searchParams.set("key", adminKey);
-    window.open(url.toString(), "_self"); // เปิดหน้าเดิม ไม่เด้งแท็บใหม่
-  }}
->
-  เปิด Kanban
-</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== Bulk actions (visible when selected) ===== */}
-      {selected.size > 0 && (
-        <div className="mb-4 p-3 border rounded-lg bg-yellow-50 flex flex-wrap items-center gap-3">
-          <div className="text-sm">เลือกแล้ว: <b>{selected.size}</b> งาน</div>
-          <button className="px-3 py-2 rounded border" onClick={selectAllVisible}>เลือกทั้งหมด</button>
-          <button className="px-3 py-2 rounded border" onClick={clearSel}>ล้าง</button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm">สถานะ:</span>
-            <select className="border rounded px-2 py-2" value={bulkStatus} onChange={e=>setBulkStatus(e.target.value as Task["status"])}>
-              {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={bulkApplyStatus}>Apply</button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm">กำหนด:</span>
-            <input type="date" className="border rounded px-2 py-2" value={bulkDue} onChange={e=>setBulkDue(e.target.value)} />
-            <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={bulkApplyDue}>Apply</button>
-          </div>
-
-          <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={bulkDelete}>ลบที่เลือก</button>
-        </div>
-      )}
-
-      {/* ===== Create row ===== */}
-      <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
-        <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
-               value={creating.title ?? ""} onChange={e=>setCreating(c=>({...c, title:e.target.value}))}/>
-        <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="รายละเอียด"
-               value={creating.description ?? ""} onChange={e=>setCreating(c=>({...c, description:e.target.value}))}/>
-        <select className="md:col-span-2 border px-3 py-3 md:py-2 rounded"
-                value={(creating.priority as Task["priority"]) ?? "medium"}
-                onChange={e=>setCreating(c=>({...c, priority: e.target.value as Task["priority"]}))}>
-          {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" placeholder="tags (comma)"
-               value={Array.isArray(creating.tags)? creating.tags.join(", ") : (creating.tags as any || "")}
-               onChange={e=>setCreating(c=>({...c, tags: parseTags(e.target.value)}))}/>
-        <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" type="date"
-               value={creating.due_at ? fmtDate(creating.due_at) : ""}
-               onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}/>
-        <button className="md:col-span-12 bg-green-600 text-white px-4 py-3 md:py-2 rounded" onClick={createRow}>+ Add</button>
-      </div>
-
-      {/* ===== Mobile: Cards ===== */}
-      <div className="space-y-3 md:hidden">
-        {items.map(t => {
-          const d = draft[t.id] || {};
-          const curProgress = d.progress ?? t.progress;
-          const curStatus = (d.status ?? t.status) as Task["status"];
-          const curPriority = (d.priority ?? t.priority) as Task["priority"];
-          const curTags = (d.tags ?? t.tags) as string[] | null;
-
-          return (
-            <div key={t.id} className="rounded-2xl border shadow-sm p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
-                  <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{t.code}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={()=>saveRow(t.id)}>Save</button>
-                  <button className="px-3 py-2 rounded bg-green-700 text-white" onClick={()=>saveRow(t.id,{ status:"done", progress:100 })}>Done</button>
-                  <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={()=>delRow(t.id)}>Del</button>
-                </div>
-              </div>
-
-              <label className="text-xs text-gray-600">Title</label>
-              <input className="border rounded w-full px-3 py-2 mb-2"
-                     defaultValue={t.title}
-                     onChange={e=>change(t.id,{ title:e.target.value })}/>
-
-              <label className="text-xs text-gray-600">Desc</label>
-              <textarea className="border rounded w-full px-3 py-2 mb-2"
-                        rows={2}
-                        defaultValue={t.description ?? ""}
-                        onChange={e=>change(t.id,{ description:e.target.value })}/>
-
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <label className="text-xs text-gray-600">Due</label>
-                  <input className="border rounded w-full px-3 py-2" type="date"
-                         defaultValue={fmtDate(t.due_at)}
-                         onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-600">Status</label>
-                  <select className="border rounded w-full px-3 py-2"
-                          value={curStatus}
-                          onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
-                    {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <label className="text-xs text-gray-600">Priority</label>
-                  <select className="border rounded w-full px-3 py-2"
-                          value={curPriority}
-                          onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}>
-                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-600">Progress: {curProgress}%</label>
-                  <input className="w-full" type="range" min={0} max={100}
-                         value={curProgress}
-                         onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
-                </div>
-              </div>
-
-              <label className="text-xs text-gray-600">Tags (comma)</label>
-              <input className="border rounded w-full px-3 py-2"
-                     defaultValue={tagsToStr(t.tags)}
-                     onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
+        {/* ===== Toolbar ===== */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4">
+          <div className="flex flex-col">
+            <label className="text-xs text-slate-600 mb-1">Group ID</label>
+            <div className="flex gap-2">
+              <input className="border border-slate-200 px-3 py-2 rounded w-full disabled:bg-slate-100" value={groupId} disabled={!editGid} onChange={e=>setGroupId(e.target.value)} />
+              {!editGid
+                ? <button className={btn("ghost")} onClick={()=>setEditGid(true)}>เปลี่ยน</button>
+                : <button className={btn("primary")} onClick={saveGid}>บันทึก</button>}
             </div>
-          );
-        })}
-        {!items.length && <div className="text-center text-gray-500 py-8">No tasks</div>}
-      </div>
-
-      {/* ===== Desktop: Table ===== */}
-      <div className="overflow-x-auto hidden md:block">
-        <table className="w-full border text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-2 text-center w-8"><input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} /></th>
-              <th className="p-2 text-left">CODE</th>
-              <th className="p-2 text-left">Title</th>
-              <th className="p-2 text-left">Desc</th>
-              <th className="p-2">Due</th>
-              <th className="p-2">Status</th>
-              <th className="p-2">Priority</th>
-              <th className="p-2">Tags</th>
-              <th className="p-2">Progress</th>
-              <th className="p-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(t => {
-              const d = draft[t.id] || {};
-              return (
-                <tr key={t.id} className="border-t">
-                  <td className="p-2 text-center">
-                    <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
-                  </td>
-                  <td className="p-2 font-mono">{t.code}</td>
-                  <td className="p-2">
-                    <input className="border px-2 py-2 w-full rounded" defaultValue={t.title}
-                           onChange={e=>change(t.id,{ title:e.target.value })}/>
-                  </td>
-                  <td className="p-2">
-                    <input className="border px-2 py-2 w-full rounded" defaultValue={t.description ?? ""}
-                           onChange={e=>change(t.id,{ description:e.target.value })}/>
-                  </td>
-                  <td className="p-2 text-center">
-                    <input className="border px-2 py-2 rounded" type="date"
-                           defaultValue={fmtDate(t.due_at)}
-                           onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
-                  </td>
-                  <td className="p-2 text-center">
-                    <select className="border px-2 py-2 rounded" defaultValue={t.status}
-                            onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
-                      {STATUS.map(s=> <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td className="p-2 text-center">
-                    <select className="border px-2 py-2 rounded" defaultValue={t.priority}
-                            onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}>
-                      {PRIORITIES.map(p=> <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </td>
-                  <td className="p-2">
-                    <input className="border px-2 py-2 w-full rounded"
-                           defaultValue={tagsToStr(t.tags)}
-                           onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
-                  </td>
-                  <td className="p-2 text-center">
-                    <input className="border px-2 py-2 w-20 text-center rounded" type="number" min={0} max={100}
-                           defaultValue={t.progress}
-                           onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
-                  </td>
-                  <td className="p-2 text-center">
-                    <button className="px-3 py-2 bg-blue-600 text-white rounded mr-2" onClick={()=>saveRow(t.id)}>Save</button>
-                    <button className="px-3 py-2 bg-green-700 text-white rounded mr-2" onClick={()=>saveRow(t.id,{ status:"done", progress:100 })}>Done</button>
-                    <button className="px-3 py-2 bg-red-600 text-white rounded" onClick={()=>delRow(t.id)}>Del</button>
-                  </td>
-                </tr>
-              );
-            })}
-            {!items.length && (
-              <tr><td className="p-6 text-center text-gray-500" colSpan={10}>No tasks</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ===== Calendar (Monthly) ===== */}
-      <div className="mt-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>← เดือนก่อน</button>
-            <div className="text-lg font-semibold">{monthLabel}</div>
-            <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>เดือนถัดไป →</button>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="month" className="border rounded px-2 py-2"
-              value={`${monthCursor.getFullYear()}-${String(monthCursor.getMonth()+1).padStart(2,"0")}`}
-              onChange={(e) => {
-                const [yy, mm] = e.target.value.split("-").map(Number);
-                if (yy && mm) setMonthCursor(new Date(yy, mm - 1, 1));
-              }}
-            />
-            <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(new Date())}>วันนี้</button>
+
+          <div className="flex flex-col">
+            <label className="text-xs text-slate-600 mb-1">Admin Key</label>
+            <div className="flex gap-2">
+              <input className="border border-slate-200 px-3 py-2 rounded w-full disabled:bg-slate-100" value={adminKey} disabled={!editKey} onChange={e=>setAdminKey(e.target.value)} />
+              {!editKey
+                ? <button className={btn("ghost")} onClick={()=>setEditKey(true)}>เปลี่ยน</button>
+                : <button className={btn("primary")} onClick={saveKey}>บันทึก</button>}
+            </div>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-xs text-slate-600 mb-1">ค้นหา</label>
+            <div className="flex gap-2">
+              <input className="border border-slate-200 px-3 py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
+              <button className={btn("neutral")} onClick={load}>Reload</button>
+              <button
+                className={btn("primary")}
+                onClick={() => {
+                  const url = new URL("/liff/kanban", location.origin);
+                  if (groupId) url.searchParams.set("group_id", groupId);
+                  if (adminKey) url.searchParams.set("key", adminKey);
+                  window.open(url.toString(), "_self");
+                }}
+              >
+                เปิด Kanban
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* weekday header */}
-        <div className="grid grid-cols-7 text-center text-xs text-gray-600 mb-1">
-          {WEEKDAY_TH.map((d) => (<div key={d} className="py-2">{d}</div>))}
+        {/* ===== Bulk actions (visible when selected) ===== */}
+        {selected.size > 0 && (
+          <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50 flex flex-wrap items-center gap-3">
+            <div className="text-sm text-slate-800">เลือกแล้ว: <b>{selected.size}</b> งาน</div>
+            <button className={btn("ghost")} onClick={selectAllVisible}>เลือกทั้งหมด</button>
+            <button className={btn("ghost")} onClick={clearSel}>ล้าง</button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-700">สถานะ:</span>
+              <select className="border border-slate-200 rounded px-2 py-2" value={bulkStatus} onChange={e=>setBulkStatus(e.target.value as Task["status"])}>
+                {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <button className={btn("primary")} onClick={bulkApplyStatus}>Apply</button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-700">กำหนด:</span>
+              <input type="date" className="border border-slate-200 rounded px-2 py-2" value={bulkDue} onChange={e=>setBulkDue(e.target.value)} />
+              <button className={btn("primary")} onClick={bulkApplyDue}>Apply</button>
+            </div>
+
+            <button className={btn("danger")} onClick={bulkDelete}>ลบที่เลือก</button>
+          </div>
+        )}
+
+        {/* ===== Create row ===== */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
+          <input className="md:col-span-3 border border-slate-200 px-3 py-2 rounded" placeholder="ชื่องานใหม่"
+                value={creating.title ?? ""} onChange={e=>setCreating(c=>({...c, title:e.target.value}))}/>
+          <input className="md:col-span-3 border border-slate-200 px-3 py-2 rounded" placeholder="รายละเอียด"
+                value={creating.description ?? ""} onChange={e=>setCreating(c=>({...c, description:e.target.value}))}/>
+          <select className="md:col-span-2 border border-slate-200 px-3 py-2 rounded"
+                  value={(creating.priority as Task["priority"]) ?? "medium"}
+                  onChange={e=>setCreating(c=>({...c, priority: e.target.value as Task["priority"]}))}>
+            {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <input className="md:col-span-2 border border-slate-200 px-3 py-2 rounded" placeholder="tags (comma)"
+                value={Array.isArray(creating.tags)? creating.tags.join(", ") : (creating.tags as any || "")}
+                onChange={e=>setCreating(c=>({...c, tags: parseTags(e.target.value)}))}/>
+          <input className="md:col-span-2 border border-slate-2 00 px-3 py-2 rounded" type="date"
+                value={creating.due_at ? fmtDate(creating.due_at) : ""}
+                onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}/>
+          <button className={cn(btn("primary"), "md:col-span-12")} onClick={createRow}>+ Add</button>
         </div>
 
-        {/* 6-week grid */}
-        <div className="grid grid-cols-7 gap-1">
-          {daysGrid.map((d) => {
-            const k = keyFromDate(d);
-            const inMonth = d.getMonth() === monthCursor.getMonth();
-            const isToday = k === todayKey;
-            const dayTasks = mapByDate.get(k) ?? [];
+        {/* ===== Mobile: Cards ===== */}
+        <div className="space-y-3 md:hidden">
+          {items.map(t => {
+            const d = draft[t.id] || {};
+            const curProgress = d.progress ?? t.progress;
+            const curStatus = (d.status ?? t.status) as Task["status"];
+            const curPriority = (d.priority ?? t.priority) as Task["priority"];
+            const curTags = (d.tags ?? t.tags) as string[] | null;
 
             return (
-              <div key={k} className={[
-                "min-h-[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
-                inMonth ? "bg-white" : "bg-gray-50 text-gray-400",
-                isToday ? "ring-2 ring-blue-500" : ""
-              ].join(" ")}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className={"text-xs " + (isToday ? "font-bold text-blue-600" : "")}>{d.getDate()}</span>
-                  {dayTasks.length > 0 && (<span className="text-[10px] text-gray-500">{dayTasks.length} งาน</span>)}
+              <div key={t.id} className="rounded-xl border border-slate-200 shadow-sm p-3 bg-white">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
+                    <span className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded">{t.code}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className={btn("ghost")} onClick={()=>saveRow(t.id)}>Save</button>
+                    <button className={btn("primary")} onClick={()=>saveRow(t.id,{ status:"done", progress:100 })}>Done</button>
+                    <button className={btn("danger")} onClick={()=>delRow(t.id)}>Del</button>
+                  </div>
                 </div>
-                <div className="space-y-1 overflow-y-auto">
-                  {dayTasks.slice(0, 4).map(t => (
-                    <div key={t.id} className="text-[11px] md:text-xs px-1 py-0.5 rounded bg-blue-50 border border-blue-100">
-                      <span className="font-mono">{t.code}</span> — {t.title}
-                    </div>
-                  ))}
-                  {dayTasks.length > 4 && (<div className="text-[11px] text-gray-500">+{dayTasks.length - 4} more…</div>)}
+
+                <label className="text-xs text-slate-600">Title</label>
+                <input className="border border-slate-200 rounded w-full px-3 py-2 mb-2"
+                      defaultValue={t.title}
+                      onChange={e=>change(t.id,{ title:e.target.value })}/>
+
+                <label className="text-xs text-slate-600">Desc</label>
+                <textarea className="border border-slate-200 rounded w-full px-3 py-2 mb-2"
+                          rows={2}
+                          defaultValue={t.description ?? ""}
+                          onChange={e=>change(t.id,{ description:e.target.value })}/>
+
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  <div>
+                    <label className="text-xs text-slate-600">Due</label>
+                    <input className="border border-slate-200 rounded w-full px-3 py-2" type="date"
+                          defaultValue={fmtDate(t.due_at)}
+                          onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Status</label>
+                    <select className="border border-slate-200 rounded w-full px-3 py-2"
+                            value={curStatus}
+                            onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
+                      {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  <div>
+                    <label className="text-xs text-slate-600">Priority</label>
+                    <select className="border border-slate-200 rounded w-full px-3 py-2"
+                            value={curPriority}
+                            onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}>
+                      {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600">Progress: {curProgress}%</label>
+                    <input className="w-full" type="range" min={0} max={100}
+                          value={curProgress}
+                          onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
+                  </div>
+                </div>
+
+                <label className="text-xs text-slate-600">Tags (comma)</label>
+                <input className="border border-slate-200 rounded w-full px-3 py-2"
+                      defaultValue={curTags?.join(", ") ?? ""}
+                      onChange={e=>change(t.id,{ tags: e.target.value.split(",").map(x=>x.trim()).filter(Boolean) })}/>
               </div>
             );
           })}
+          {!items.length && <div className="text-center text-slate-500 py-8">No tasks</div>}
         </div>
 
-        <div className="mt-3 text-xs text-gray-500">
-          แสดงงานตาม <b>due date</b> (เวลาไทย). งานที่ไม่มี due date จะไม่แสดงในปฏิทิน
+        {/* ===== Desktop: Table ===== */}
+        <div className="overflow-x-auto hidden md:block">
+          <table className="w-full border border-slate-200 rounded-md text-sm bg-white">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="p-2 text-center w-8 border-b border-slate-200">
+                  <input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} />
+                </th>
+                <th className="p-2 text-left border-b border-slate-200">CODE</th>
+                <th className="p-2 text-left border-b border-slate-200">Title</th>
+                <th className="p-2 text-left border-b border-slate-200">Desc</th>
+                <th className="p-2 border-b border-slate-200">Due</th>
+                <th className="p-2 border-b border-slate-200">Status</th>
+                <th className="p-2 border-b border-slate-200">Priority</th>
+                <th className="p-2 border-b border-slate-200">Tags</th>
+                <th className="p-2 border-b border-slate-200">Progress</th>
+                <th className="p-2 border-b border-slate-200">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(t => {
+                const d = draft[t.id] || {};
+                return (
+                  <tr key={t.id} className="border-t border-slate-200">
+                    <td className="p-2 text-center">
+                      <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
+                    </td>
+                    <td className="p-2 font-mono">{t.code}</td>
+                    <td className="p-2">
+                      <input className="border border-slate-200 px-2 py-2 w-full rounded" defaultValue={t.title}
+                            onChange={e=>change(t.id,{ title:e.target.value })}/>
+                    </td>
+                    <td className="p-2">
+                      <input className="border border-slate-200 px-2 py-2 w-full rounded" defaultValue={t.description ?? ""}
+                            onChange={e=>change(t.id,{ description:e.target.value })}/>
+                    </td>
+                    <td className="p-2 text-center">
+                      <input className="border border-slate-200 px-2 py-2 rounded" type="date"
+                            defaultValue={fmtDate(t.due_at)}
+                            onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
+                    </td>
+                    <td className="p-2 text-center">
+                      <select className="border border-slate-200 px-2 py-2 rounded" defaultValue={t.status}
+                              onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
+                        {STATUS.map(s=> <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td className="p-2 text-center">
+                      <select className="border border-slate-200 px-2 py-2 rounded" defaultValue={t.priority}
+                              onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}>
+                        {PRIORITIES.map(p=> <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </td>
+                    <td className="p-2">
+                      <input className="border border-slate-200 px-2 py-2 w-full rounded"
+                            defaultValue={(t.tags ?? []).join(", ")}
+                            onChange={e=>change(t.id,{ tags: e.target.value.split(",").map(x=>x.trim()).filter(Boolean) })}/>
+                    </td>
+                    <td className="p-2 text-center">
+                      <input className="border border-slate-200 px-2 py-2 w-20 text-center rounded" type="number" min={0} max={100}
+                            defaultValue={t.progress}
+                            onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
+                    </td>
+                    <td className="p-2 text-center">
+                      <button className={btn("ghost") + " mr-2"} onClick={()=>saveRow(t.id)}>Save</button>
+                      <button className={btn("primary") + " mr-2"} onClick={()=>saveRow(t.id,{ status:"done", progress:100 })}>Done</button>
+                      <button className={btn("danger")} onClick={()=>delRow(t.id)}>Del</button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!items.length && (
+                <tr><td className="p-6 text-center text-slate-500" colSpan={10}>No tasks</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+
+        {/* ===== Calendar (Monthly) ===== */}
+        <div className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <button className={btn("ghost")} onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>← เดือนก่อน</button>
+              <div className="text-lg font-semibold text-slate-900">{monthLabel}</div>
+              <button className={btn("ghost")} onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>เดือนถัดไป →</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="month" className="border border-slate-200 rounded px-2 py-2"
+                value={`${monthCursor.getFullYear()}-${String(monthCursor.getMonth()+1).padStart(2,"0")}`}
+                onChange={(e) => {
+                  const [yy, mm] = e.target.value.split("-").map(Number);
+                  if (yy && mm) setMonthCursor(new Date(yy, mm - 1, 1));
+                }}
+              />
+              <button className={btn("ghost")} onClick={() => setMonthCursor(new Date())}>วันนี้</button>
+            </div>
+          </div>
+
+          {/* weekday header */}
+          <div className="grid grid-cols-7 text-center text-xs text-slate-600 mb-1">
+            {WEEKDAY_TH.map((d) => (<div key={d} className="py-2">{d}</div>))}
+          </div>
+
+          {/* 6-week grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {daysGrid.map((d) => {
+              const k = keyFromDate(d);
+              const inMonth = d.getMonth() === monthCursor.getMonth();
+              const isToday = k === todayKey;
+              const dayTasks = mapByDate.get(k) ?? [];
+
+              return (
+                <div
+                  key={k}
+                  className={cn(
+                    "min-h-[92px] md:min-h-[110px] border border-slate-200 rounded p-1 md:p-2 flex flex-col",
+                    inMonth ? "bg-white" : "bg-slate-50 text-slate-400",
+                    isToday && "ring-2 ring-green-500"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={cn("text-xs", isToday && "font-bold text-green-700")}>{d.getDate()}</span>
+                    {dayTasks.length > 0 && (<span className="text-[10px] text-slate-500">{dayTasks.length} งาน</span>)}
+                  </div>
+                  <div className="space-y-1 overflow-y-auto">
+                    {dayTasks.slice(0, 4).map(t => (
+                      <div key={t.id} className="text-[11px] md:text-xs px-1 py-0.5 rounded bg-emerald-50 border border-emerald-100">
+                        <span className="font-mono">{t.code}</span> — {t.title}
+                      </div>
+                    ))}
+                    {dayTasks.length > 4 && (<div className="text-[11px] text-slate-500">+{dayTasks.length - 4} more…</div>)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500">
+            แสดงงานตาม <b>due date</b> (เวลาไทย). งานที่ไม่มี due date จะไม่แสดงในปฏิทิน
+          </div>
+        </div>
+      </main>
+
+      <footer className="mt-8 border-t border-slate-200 bg-slate-50">
+        <div className="mx-auto max-w-screen-xl px-4 py-4 text-slate-500 text-sm">
+          © 2025 mdes-task-bot. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }
