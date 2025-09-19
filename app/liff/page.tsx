@@ -21,8 +21,6 @@ type Task = {
 
 const STATUS = ["todo","in_progress","blocked","done","cancelled"] as const;
 const PRIORITIES = ["low","medium","high","urgent"] as const;
-const LS_GID = "taskbot_gid";
-const LS_KEY = "taskbot_key";
 const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]; // เริ่ม จันทร์
 
 // keys กลาง + สำรอง (ให้สองหน้าคุยกันรู้เรื่อง)
@@ -36,10 +34,6 @@ const readFirst = (keys: string[]): string => {
 
 const writeAll = (keys: string[], value: string) => {
   try { keys.forEach(k => localStorage.setItem(k, value)); } catch {}
-};
-
-const removeAll = (keys: string[]) => {
-  try { keys.forEach(k => localStorage.removeItem(k)); } catch {}
 };
 
 export default function LiffAdminPage() {
@@ -102,8 +96,6 @@ export default function LiffAdminPage() {
           if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
           if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
           const ctx = liff?.getContext?.();
-          // ถ้าทดสอบบนมือถือ อยากให้เห็นทันที
-          // alert("ctx: " + JSON.stringify(ctx));
           if (ctx?.type === "group" && ctx.groupId) {
             setGroupId(ctx.groupId);
             writeAll(GID_KEYS, ctx.groupId);
@@ -127,7 +119,6 @@ export default function LiffAdminPage() {
       return;
     }
     const j = await r.json();
-    // รองรับทั้งสองรูปแบบ response
     setItems(Array.isArray(j) ? j : (j.items ?? []));
     clearSel();
   };
@@ -240,9 +231,9 @@ export default function LiffAdminPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Global header (เรียบ/สะอาด) */}
+      {/* Global header (เต็มความกว้าง) */}
       <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
-        <div className="mx-auto max-w-screen-xl px-4 h-14 flex items-center gap-4">
+        <div className="w-full px-4 md:px-8 h-14 flex items-center gap-4">
           <div className="font-semibold text-slate-800">mdes-task-bot — LIFF Admin</div>
           <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600">
             <a className="hover:text-slate-900" href="/liff">Tasks</a>
@@ -257,7 +248,7 @@ export default function LiffAdminPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-screen-xl px-4 py-6 md:py-8">
+      <main className="w-full px-4 md:px-8 py-6 md:py-8">
         {/* โหลด LIFF SDK ของ LINE */}
         <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
 
@@ -300,7 +291,7 @@ export default function LiffAdminPage() {
                   const url = new URL("/liff/kanban", location.origin);
                   if (groupId) url.searchParams.set("group_id", groupId);
                   if (adminKey) url.searchParams.set("key", adminKey);
-                  window.open(url.toString(), "_self"); // เปิดหน้าเดิม ไม่เด้งแท็บใหม่
+                  window.open(url.toString(), "_self");
                 }}
               >
                 เปิด Kanban
@@ -309,7 +300,7 @@ export default function LiffAdminPage() {
           </div>
         </div>
 
-        {/* ===== Bulk actions (visible when selected) ===== */}
+        {/* ===== Bulk actions ===== */}
         {selected.size > 0 && (
           <div className="mb-4 p-3 border rounded-lg bg-yellow-50 flex flex-wrap items-center gap-3">
             <div className="text-sm">เลือกแล้ว: <b>{selected.size}</b> งาน</div>
@@ -361,7 +352,6 @@ export default function LiffAdminPage() {
             const curProgress = d.progress ?? t.progress;
             const curStatus = (d.status ?? t.status) as Task["status"];
             const curPriority = (d.priority ?? t.priority) as Task["priority"];
-            const curTags = (d.tags ?? t.tags) as string[] | null;
 
             return (
               <div key={t.id} className="rounded-2xl border shadow-sm p-3">
@@ -424,8 +414,8 @@ export default function LiffAdminPage() {
 
                 <label className="text-xs text-gray-600">Tags (comma)</label>
                 <input className="border rounded w-full px-3 py-2"
-                       defaultValue={tagsToStr(t.tags)}
-                       onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
+                       defaultValue={(t.tags ?? []).join(", ")}
+                       onChange={e=>change(t.id,{ tags: e.target.value.split(",").map(x=>x.trim()).filter(Boolean) })}/>
               </div>
             );
           })}
@@ -485,8 +475,8 @@ export default function LiffAdminPage() {
                     </td>
                     <td className="p-2">
                       <input className="border px-2 py-2 w-full rounded"
-                             defaultValue={tagsToStr(t.tags)}
-                             onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
+                             defaultValue={(t.tags ?? []).join(", ")}
+                             onChange={e=>change(t.id,{ tags: e.target.value.split(",").map(x=>x.trim()).filter(Boolean) })}/>
                     </td>
                     <td className="p-2 text-center">
                       <input className="border px-2 py-2 w-20 text-center rounded" type="number" min={0} max={100}
@@ -533,8 +523,8 @@ export default function LiffAdminPage() {
             {WEEKDAY_TH.map((d) => (<div key={d} className="py-2">{d}</div>))}
           </div>
 
-          {/* 6-week grid */}
-          <div className="grid grid-cols-7 gap-1">
+          {/* 6-week grid (เต็มกว้าง) */}
+          <div className="grid grid-cols-7 gap-1 md:gap-2">
             {daysGrid.map((d) => {
               const k = keyFromDate(d);
               const inMonth = d.getMonth() === monthCursor.getMonth();
