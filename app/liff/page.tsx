@@ -248,10 +248,19 @@ const saveKey = () => { writeAll(KEY_KEYS, adminKey); setEditKey(false); load();
         strategy="afterInteractive" 
       />
 
-      {/* Header + Link to Kanban */}
-      <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <h1 className="text-xl md:text-2xl font-semibold">LIFF Admin — Tasks</h1>
-      </div>
+
+    <div className="min-h-screen bg-white">
+      {/* Global header (เรียบ/สะอาด) */}
+      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
+        <div className="mx-auto max-w-screen-xl px-4 h-14 flex items-center gap-4">
+          <div className="font-semibold text-slate-800">mdes-task-bot — LIFF Admin</div>
+          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600">
+            <a className="hover:text-slate-900" href="/liff">Tasks</a>
+            <a className="hover:text-slate-900" href="/liff/kanban">Kanban</a>
+          </nav>
+          <a href="/liff/kanban" className={btn("primary") + " md:hidden ml-auto"}>Kanban</a>
+        </div>
+      </header>
 
       {/* ===== Toolbar ===== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-4">
