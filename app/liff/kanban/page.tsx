@@ -297,21 +297,33 @@ export default function KanbanPage() {
     if (opts.inviteEmail) params.set("add", opts.inviteEmail);
     return `${base}?${params.toString()}`;
   }
-  function addToCalendar() {
-    const t = editTask;
-    if (!t) return;
-    if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
-    const startLocal = new Date(`${calDate}T${calStart}:00`);
-    const endLocal = new Date(`${calDate}T${calEnd}:00`);
-    if (endLocal <= startLocal) { alert("เวลาเสร็จต้องหลังเวลาเริ่ม"); return; }
-    const url = googleCalendarUrl({
-      title: calTitle || t.title, details: calDesc || t.description || "",
-      location: calLocation || "", start: startLocal, end: endLocal,
-      inviteEmail: calEmail || undefined,
+async function addToCalendarServer() {
+  const t = editTask;
+  if (!t) return;
+  if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
+  const body = {
+    title:      calTitle || t.title,
+    description: calDesc || t.description || "",
+    location:    calLocation || "",
+    date:        calDate,     // "YYYY-MM-DD"
+    start:       calStart,    // "HH:mm"
+    end:         calEnd,      // "HH:mm"
+    attendeeEmail: calEmail || undefined,
+  };
+  try {
+    const r = await fetch("/api/calendar/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
+  } catch (e: any) {
+    console.error("ADD_CAL_ERR", e?.message || e);
+    alert("ลงตารางไม่สำเร็จ — ตรวจสิทธิ์แชร์ปฏิทิน, CALENDAR_ID, และ ENV อีกครั้ง");
   }
-
+}
   /** ========= Render ========= */
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -558,7 +570,7 @@ export default function KanbanPage() {
               </div>
 
               <div className="mt-3 flex justify-end">
-                <button onClick={addToCalendar} className={btn("primary")}>
+                <button onClick={addToCalendarServer} className={btn("primary")}>
                   เพิ่มใน Google Calendar
                 </button>
               </div>
