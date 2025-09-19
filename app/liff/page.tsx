@@ -286,7 +286,7 @@ export default function LiffAdminPage() {
               <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
               <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>Reload</button>
               <button
-                className="w-full bg-indigo-600 text-white px-3 py-3 md:py-2 rounded"
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-3 md:py-2 rounded"
                 onClick={() => {
                   const url = new URL("/liff/kanban", location.origin);
                   if (groupId) url.searchParams.set("group_id", groupId);
