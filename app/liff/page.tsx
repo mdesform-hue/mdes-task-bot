@@ -443,7 +443,7 @@ export default function LiffAdminPage() {
           <table className="w-full border border-slate-200 rounded-md text-sm bg-white">
             <thead className="bg-slate-50">
               <tr>
-                <th className="p-2 text-center w-8 border-b border-slate-200">
+                <th className="p-2 text-center w-8 border-b border-slate-200 whitespace-nowrap w-[180px]">
                   <input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} />
                 </th>
                 <th className="p-2 text-left border-b border-slate-200">CODE</th>
