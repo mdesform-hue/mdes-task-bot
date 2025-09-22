@@ -14,7 +14,8 @@ export async function HEAD() { return new Response(null, { status: 200 }); }
 
 // ---------- Helpers (AI intent & parsing) ----------
 function hasScheduleKeyword(text: string) {
-  return /ลงตาราง/i.test(text);
+  // robust ขึ้นเล็กน้อย (กันการติดกัน/มีสเปซแปลก ๆ)
+  return /(^|\s)ลงตาราง(\s|$)/i.test(text);
 }
 
 function extractEmails(text: string): string[] {
@@ -86,7 +87,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
   }
 
   // --- 2) พรุ่งนี้ / มะรืน ---
-  // พรุ่งนี้ ทั้งวัน
   if (/\bพรุ่งนี้\b.*\bทั้งวัน\b|\bทั้งวัน\b.*\bพรุ่งนี้\b/i.test(text)) {
     const tmr = new Date(base); tmr.setDate(tmr.getDate() + 1);
     const { y: y1, m: m1, d: d1 } = ymdFrom(tmr);
@@ -96,7 +96,7 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
     return { kind: "allday", startDate, endDate };
   }
-  // พรุ่งนี้ HH โมง (แก้ timezone ให้ถูกต้อง)
+  // พรุ่งนี้ HH โมง
   let mTmr = text.match(/พรุ่งนี้\s*(\d{1,2})\s*โมง/i);
   if (mTmr) {
     const hh = Math.max(0, Math.min(23, parseInt(mTmr[1], 10)));
@@ -117,7 +117,7 @@ function parseThaiDate(text: string): ParsedWhen | null {
     return { kind: "allday", startDate, endDate };
   }
 
-  // --- 3) รูปแบบ: "<วันที่เดือนนี้> HH โมง" เช่น "27 10 โมง"
+  // --- 3) "<วันที่เดือนนี้> HH โมง" เช่น "27 10 โมง"
   let mDayTime = text.match(/\b(\d{1,2})\s+(\d{1,2})\s*โมง\b/);
   if (mDayTime) {
     const dd = Math.max(1, Math.min(31, parseInt(mDayTime[1], 10)));
@@ -126,7 +126,7 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
   }
-  // "<วันที่เดือนนี้> ทั้งวัน" เช่น "27 ทั้งวัน"
+  // "<วันที่เดือนนี้> ทั้งวัน"
   let mDayAll = text.match(/\b(\d{1,2})\s*ทั้งวัน\b/);
   if (mDayAll) {
     const dd = Math.max(1, Math.min(31, parseInt(mDayAll[1], 10)));
@@ -147,7 +147,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
   } else if (due && !tim) {
-    // ไม่มี time → ถือเป็น all-day
     const startDate = due;
     const endObj = new Date(`${due}T00:00:00+07:00`);
     endObj.setDate(endObj.getDate() + 1);
@@ -167,7 +166,6 @@ function fmtDate(d: string | Date) {
   }).format(dt);
 }
 function fmtThaiDateOnly(dateStr: string) {
-  // dateStr = YYYY-MM-DD
   const dt = new Date(`${dateStr}T00:00:00+07:00`);
   return new Intl.DateTimeFormat("th-TH", {
     timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit"
@@ -219,16 +217,15 @@ export async function POST(req: Request) {
     const groupId: string = ev.source.groupId;
     const text = (ev.message.text as string).trim();
 
-    // ---- AI Intent (ดักก่อน) ----
+    // ---- AI Intent ----
     if (/^ai\s+/i.test(text)) {
       try {
         const wantCalendar = hasScheduleKeyword(text);
         const emails = extractEmails(text);
-        const when = parseThaiDate(text); // อาจคืน timed หรือ allday หรือ null
+        const when = parseThaiDate(text); // อาจคืน timed / allday / null
 
         const titleRaw = extractTitle(text);
         const title = titleRaw
-          // ตัดคำที่เกี่ยวกับเวลาออกจากชื่อเรื่อง
           .replace(/\bวันนี้\b/gi, "")
           .replace(/\bพรุ่งนี้\b/gi, "")
           .replace(/\bทั้งวัน\b/gi, "")
@@ -246,9 +243,17 @@ export async function POST(req: Request) {
           insert into public.groups (id) values (${groupId})
           on conflict (id) do nothing`;
 
-        // ---- ลง Calendar + Task (ถ้าระบุ "ลงตาราง" และตีความเวลาได้) ----
+        // -- ถ้าผู้ใช้สั่ง "ลงตาราง" แต่ตีความเวลาไม่ได้ → แจ้งให้ระบุเวลา --
+        if (wantCalendar && !when) {
+          await reply(ev.replyToken, {
+            type: "text",
+            text: "ขอเวลาให้ชัดเจนหน่อยครับ เช่น:\nai ลงตาราง ทดสอบ วันนี้ 12 โมง\nai ลงตาราง ประชุม due=2025-09-30 time=14:00"
+          });
+          continue;
+        }
+
+        // ---- ลง Calendar + Task (เมื่อ wantCalendar && when) ----
         if (wantCalendar && when) {
-          // เตรียมข้อมูลเพื่อบันทึก Task
           let dueAtISO: string | null = null;
           let descNote = `สร้างจาก LINE group ${groupId}`;
           let calendarMsg = "";
@@ -256,7 +261,6 @@ export async function POST(req: Request) {
           if (when.kind === "timed") {
             dueAtISO = when.startISO;
             calendarMsg = `• เวลา: ${fmtDate(when.startISO)} - ${fmtDate(when.endISO)}`;
-            // เรียก calendar (timed)
             await createCalendarEvent({
               title,
               startISO: when.startISO,
@@ -265,13 +269,11 @@ export async function POST(req: Request) {
               description: `${descNote}`,
             } as any);
           } else {
-            // all-day: ใช้ต้นวันเป็น due_at ไว้เรียง/list และใส่ note
             dueAtISO = new Date(`${when.startDate}T00:00:00+07:00`).toISOString();
             descNote = `[ALL_DAY] ${descNote}`;
             calendarMsg = when.startDate === when.endDate
               ? `• เวลา: ทั้งวัน ${fmtThaiDateOnly(when.startDate)}`
               : `• เวลา: ทั้งวัน ${fmtThaiDateOnly(when.startDate)} - ${fmtThaiDateOnly(when.endDate)}`;
-            // เรียก calendar (all-day)
             await createCalendarEvent({
               title,
               allDay: true,
@@ -465,7 +467,7 @@ export async function POST(req: Request) {
           where group_id=${groupId} and (code=${key} or id::text=${key})
           limit 1`;
         if (!found.length) {
-          await reply(ev.replyToken, { type: "text", text: "ไม่พบน้ำงานที่ระบุ (ตรวจสอบ code อีกครั้ง)" });
+          await reply(ev.replyToken, { type: "text", text: "ไม่พบงานที่ระบุ (ตรวจสอบ code อีกครั้ง)" });
           continue;
         }
         const t   = found[0];
@@ -528,8 +530,7 @@ export async function POST(req: Request) {
     }
 
     // ---- default ----
-    // เดิม: ส่ง helpText ตลอด → ทำให้ขึ้นทุกข้อความ
-    // แก้: ไม่ตอบกลับ (ปล่อยผ่าน) สำหรับข้อความที่ไม่เข้ากับคำสั่งใด ๆ
+    // ไม่ตอบกลับสำหรับข้อความที่ไม่เข้ากับคำสั่งใด ๆ
     continue;
   }
 
