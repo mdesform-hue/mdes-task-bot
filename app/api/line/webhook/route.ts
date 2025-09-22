@@ -528,7 +528,9 @@ export async function POST(req: Request) {
     }
 
     // ---- default ----
-    await reply(ev.replyToken, { type: "text", text: helpText(groupId) });
+    // เดิม: ส่ง helpText ตลอด → ทำให้ขึ้นทุกข้อความ
+    // แก้: ไม่ตอบกลับ (ปล่อยผ่าน) สำหรับข้อความที่ไม่เข้ากับคำสั่งใด ๆ
+    continue;
   }
 
   return new Response("ok", { status: 200 });
