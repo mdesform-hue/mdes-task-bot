@@ -30,20 +30,13 @@ function extractEmails(text: string): string[] {
 
 function extractTitle(raw: string) {
   let t = raw.replace(/^ai\s*/i, "").trim();
-  // ลบ "ลงตาราง" + "ลงตารางเวลา" + ช่องว่างหลังคำสั่ง
   t = t.replace(/^ลงตาราง(?:\s*เวลา)?\s*/i, "").trim();
 
-  // ตัดส่วนเวลา/วันที่ออกจาก title ให้เกลี้ยงขึ้น (ไม่พึ่ง \b กับไทย)
   t = t
-    // วันนี้ + เวลา (รองรับ 14:30 / 14.30 / 14 โมง / 14 น.)
     .replace(/วันนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/gi, "")
-    // พรุ่งนี้ + เวลา
     .replace(/พรุ่งนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/gi, "")
-    // รูปแบบ "<วันที่เดือนนี้> HH[:.]MM?" เช่น "27 10.30" หรือ "27 10"
     .replace(/(^|\s)(\d{1,2})\s+(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?(\s|$)/gi, " ")
-    // "<วันที่เดือนนี้> ทั้งวัน"
     .replace(/(^|\s)(\d{1,2})\s*ทั้งวัน(\s|$)/gi, " ")
-    // due=YYYY-MM-DD | time=HH:MM | คำทั่วไป
     .replace(/time=\d{1,2}[.:]\d{2}/i, "")
     .replace(/due=\d{4}-\d{2}-\d{2}/i, "")
     .replace(/\bemail=[^\s|,;]+/i, "")
@@ -83,7 +76,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
   const { y, m, d } = ymdFrom(base);
 
   // --- 1) TODAY / "วันนี้" ---
-  // วันนี้ ทั้งวัน (ไม่พึ่ง \b)
   if (/(วันนี้.*ทั้งวัน|ทั้งวัน.*วันนี้)/i.test(text)) {
     const startDate = `${y}-${pad2(m)}-${pad2(d)}`;
     const end = new Date(base); end.setDate(end.getDate() + 1);
@@ -91,7 +83,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const endDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
     return { kind: "allday", startDate, endDate };
   }
-  // วันนี้ HH[:.|]MM? (ยอมรับไม่มีช่องว่าง/มีคำแทรกสั้น ๆ)
   let mTodayTime = text.match(/วันนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/i);
   if (mTodayTime) {
     const hh = Math.max(0, Math.min(23, parseInt(mTodayTime[1], 10)));
@@ -100,7 +91,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
   }
-  // แค่ "วันนี้" → all-day
   if (/วันนี้/i.test(text)) {
     const startDate = `${y}-${pad2(m)}-${pad2(d)}`;
     const end = new Date(base); end.setDate(end.getDate() + 1);
@@ -139,7 +129,7 @@ function parseThaiDate(text: string): ParsedWhen | null {
     return { kind: "allday", startDate, endDate };
   }
 
-  // --- 3) "<วันที่เดือนนี้> เวลา HH[:.|]MM? (น.|โมง optional)" หรือ "<วันที่เดือนนี้> HH[:.|]MM?"
+  // --- 3) "<วันที่เดือนนี้> HH[:.|]MM?" หรือ "<วันที่เดือนนี้> ทั้งวัน"
   let mDayTime = text.match(/(^|\s)(\d{1,2})\s+(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?(\s|$)/);
   if (mDayTime) {
     const dd = Math.max(1, Math.min(31, parseInt(mDayTime[2], 10)));
@@ -149,7 +139,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
   }
-  // "<วันที่เดือนนี้> ทั้งวัน" เช่น "27 ทั้งวัน"
   let mDayAll = text.match(/(^|\s)(\d{1,2})\s*ทั้งวัน(\s|$)/);
   if (mDayAll) {
     const dd = Math.max(1, Math.min(31, parseInt(mDayAll[2], 10)));
@@ -170,7 +159,6 @@ function parseThaiDate(text: string): ParsedWhen | null {
     const end = new Date(start.getTime() + 60 * 60 * 1000);
     return { kind: "timed", startISO: start.toISOString(), endISO: end.toISOString() };
   } else if (due && !tim) {
-    // ไม่มี time → ถือเป็น all-day
     const startDate = due;
     const endObj = new Date(`${due}T00:00:00+07:00`);
     endObj.setDate(endObj.getDate() + 1);
@@ -190,7 +178,6 @@ function fmtDate(d: string | Date) {
   }).format(dt);
 }
 function fmtThaiDateOnly(dateStr: string) {
-  // dateStr = YYYY-MM-DD
   const dt = new Date(`${dateStr}T00:00:00+07:00`);
   return new Intl.DateTimeFormat("th-TH", {
     timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit"
@@ -247,8 +234,7 @@ export async function POST(req: Request) {
       try {
         const wantCalendar = hasScheduleKeyword(text);
         const emails = extractEmails(text);
-        const when = parseThaiDate(text); // อาจคืน timed หรือ allday หรือ null
-
+        const when = parseThaiDate(text);
         const title = extractTitle(text);
 
         // ensure group
@@ -272,11 +258,11 @@ export async function POST(req: Request) {
           let calendarMsg = "";
 
           if (when.kind === "timed") {
-            // ป้องกันเวลาย้อนหลัง → แจ้งผู้ใช้ให้ใส่เวลาใหม่ (ไม่เลื่อนอัตโนมัติ)
-            const nowBkk = bkkToday();
+            // ✅ ใช้เวลาปัจจุบันจริง (epoch) เทียบกับ startISO (UTC) ป้องกัน false positive
+            const now = new Date();
             const start = new Date(when.startISO);
 
-            if (start.getTime() <= nowBkk.getTime()) {
+            if (start.getTime() <= now.getTime()) {
               await reply(ev.replyToken, {
                 type: "text",
                 text:
@@ -300,7 +286,7 @@ export async function POST(req: Request) {
               description: `${descNote}`,
             } as any);
           } else {
-            // all-day: ใช้ต้นวันเป็น due_at ไว้เรียง/list และใส่ note
+            // all-day: ใช้ต้นวันเป็น due_at และบันทึกโน้ต
             dueAtISO = new Date(`${when.startDate}T00:00:00+07:00`).toISOString();
             descNote = `[ALL_DAY] ${descNote}`;
             calendarMsg = when.startDate === when.endDate
@@ -563,7 +549,6 @@ export async function POST(req: Request) {
     }
 
     // ---- default ----
-    // ไม่ตอบกลับ (ปล่อยผ่าน) สำหรับข้อความที่ไม่เข้ากับคำสั่งใด ๆ
     continue;
   }
 
