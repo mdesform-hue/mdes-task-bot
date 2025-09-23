@@ -271,6 +271,7 @@ export default function LiffAdminPage() {
           <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600">
             <a className="hover:text-slate-900" href="/liff">Tasks</a>
             <a className="hover:text-slate-900" href="/liff/kanban">Kanban</a>
+            <a className="text-slate-900 border-b-2 border-emerald-500" href="/liff/dashboard">Dashboard</a>
           </nav>
           <a
             href="/liff/kanban"
