@@ -318,7 +318,7 @@ export default function LiffAdminPage() {
             <label className="text-sm mb-1">ค้นหา</label>
             <div className="flex gap-2">
               <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
-              <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>Reload</button>
+              <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>รีเฟรช</button>
               <button
                 className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-3 md:py-2 rounded"
                 onClick={() => {
