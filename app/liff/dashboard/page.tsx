@@ -67,8 +67,8 @@ const PRIORITY_LABEL: Record<Priority, string> = {
 
 const PRIORITY_COLOR: Record<Priority, string> = {
   urgent: "#ef4444", // แดง
-  high:   "#f59e0b", // เหลืองส้ม
-  medium: "#0ea5e9", // ฟ้า
+  high:   "#f97316", // เหลืองส้ม
+  medium: "#eab308", // ฟ้า
   low:    "#22c55e", // เขียว
 };
 
