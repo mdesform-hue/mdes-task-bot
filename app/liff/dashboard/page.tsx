@@ -50,6 +50,13 @@ function thDate(iso?: string | null) {
 function startOfDay(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 const COLORS = ["#22c55e", "#0ea5e9", "#ef4444", "#16a34a", "#94a3b8"];
+const STATUS_COLOR: Record<Status, string> = {
+  todo: "#6b7280",
+  in_progress: "#0ea5e9",
+  blocked: "#ef4444",
+  done: "#22c55e",
+  cancelled: "#a855f7",
+};
 
 export default function LiffDashboardPage() {
   const [groupId, setGroupId] = useState("");
@@ -248,7 +255,7 @@ export default function LiffDashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={90} label>
-                    {statusPieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    {statusPieData.map((e, i) => <Cell key={i} fill={e.STATUS_COLOR[s]} />)}
                   </Pie>
                   <Tooltip />
                   <Legend />
