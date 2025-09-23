@@ -154,10 +154,14 @@ export default function LiffDashboardPage() {
   }, [monthFiltered]);
 
   // ======== Data สำหรับกราฟ ========
-  const statusPieData = useMemo(
-    () => STATUS_ORDER.map((s, i) => ({ name: STATUS_LABEL[s], value: kpi.byStatus[s], color: COLORS[i % COLORS.length] })),
-    [kpi.byStatus]
-  );
+const statusPieData = useMemo(
+  () => STATUS_ORDER.map((s) => ({
+    key: s, // เก็บค่า status ไว้
+    name: STATUS_LABEL[s],
+    value: kpi.byStatus[s],
+  })),
+  [kpi.byStatus]
+);
   const priorityBarData = useMemo(
     () => PR_ORDER.map((p, i) => ({ name: p.toUpperCase(), จำนวน: kpi.byPriority[p], color: COLORS[(i+1) % COLORS.length] })),
     [kpi.byPriority]
@@ -254,8 +258,10 @@ export default function LiffDashboardPage() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={90} label>
-                    {statusPieData.map((e, i) => <Cell key={i} fill={e.STATUS_COLOR[s]} />)}
+               <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={90} label>
+  {statusPieData.map((e, i) => (
+    <Cell key={i} fill={STATUS_COLOR[e.key as Status]} />
+  ))}
                   </Pie>
                   <Tooltip />
                   <Legend />
