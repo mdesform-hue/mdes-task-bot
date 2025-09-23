@@ -2,6 +2,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Script from "next/script";
+import {
+  ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line
+} from "recharts";
 
 type Status = "todo" | "in_progress" | "blocked" | "done" | "cancelled";
 type Priority = "low" | "medium" | "high" | "urgent";
@@ -21,7 +27,6 @@ type Task = {
   updated_at: string;
 };
 
-// แชร์ key กับหน้าอื่น ๆ
 const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];
 const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];
 const readFirst = (keys: string[]): string => { try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {} return ""; };
@@ -39,12 +44,12 @@ const PR_ORDER: Priority[] = ["urgent","high","medium","low"];
 
 function thDate(iso?: string | null) {
   if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" });
-  } catch { return "-"; }
+  try { return new Date(iso).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" }); }
+  catch { return "-"; }
 }
 function startOfDay(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+const COLORS = ["#22c55e", "#0ea5e9", "#ef4444", "#16a34a", "#94a3b8"];
 
 export default function LiffDashboardPage() {
   const [groupId, setGroupId] = useState("");
@@ -56,7 +61,6 @@ export default function LiffDashboardPage() {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   });
 
-  // init: URL -> localStorage -> LIFF
   useEffect(() => {
     (async () => {
       const url = new URL(location.href);
@@ -64,10 +68,8 @@ export default function LiffDashboardPage() {
       const qsKey = url.searchParams.get("key");
       if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
       if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
-
       if (!qsGid) { const v = readFirst(GID_KEYS); if (v) setGroupId(v); }
       if (!qsKey) { const v = readFirst(KEY_KEYS); if (v) setAdminKey(v); }
-
       try {
         const liff: any = (window as any).liff;
         if (!readFirst(GID_KEYS) && process.env.NEXT_PUBLIC_LIFF_ID) {
@@ -97,7 +99,6 @@ export default function LiffDashboardPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [groupId, adminKey]);
 
-  // filter ตามเดือนที่เลือก (optional)
   const monthFiltered = useMemo(() => {
     if (!month) return items;
     const [yy, mm] = month.split("-").map(Number);
@@ -108,7 +109,6 @@ export default function LiffDashboardPage() {
     });
   }, [items, month]);
 
-  // สรุป KPI
   const kpi = useMemo(() => {
     const arr = monthFiltered;
     const total = arr.length;
@@ -126,20 +126,18 @@ export default function LiffDashboardPage() {
 
     const avgProgress = total ? Math.round(arr.reduce((s, t) => s + Number(t.progress || 0), 0) / total) : 0;
 
-    // นับตามสถานะ/ความสำคัญ
     const byStatus: Record<Status, number> = { todo:0, in_progress:0, blocked:0, done:0, cancelled:0 };
     arr.forEach(t => { byStatus[t.status]++; });
+
     const byPriority: Record<Priority, number> = { urgent:0, high:0, medium:0, low:0 };
     arr.forEach(t => { byPriority[t.priority]++; });
 
-    // งานที่เลยกำหนดมากที่สุด (top 10)
     const late = arr
       .filter(t => t.due_at && new Date(t.due_at) < today && t.status !== "done" && t.status !== "cancelled")
       .map(t => ({ ...t, lateDays: Math.ceil((+today - +startOfDay(new Date(t.due_at!))) / 86400000) }))
       .sort((a,b) => b.lateDays - a.lateDays)
       .slice(0, 10);
 
-    // งานใกล้ครบกำหนด (3 วัน)
     const near3 = arr
       .filter(t => t.due_at && new Date(t.due_at) >= today && new Date(t.due_at) < addDays(today, 3) && t.status !== "done")
       .sort((a,b) => +new Date(a.due_at!) - +new Date(b.due_at!))
@@ -148,25 +146,31 @@ export default function LiffDashboardPage() {
     return { total, done, inProgress, blocked, avgProgress, overdue, upcoming7, byStatus, byPriority, late, near3 };
   }, [monthFiltered]);
 
-  // กราฟแท่งง่าย ๆ (div)
-  function Bar({ value, max, label, sub }: { value: number; max: number; label: string; sub?: string }) {
-    const pct = max > 0 ? (value / max) * 100 : 0;
-    return (
-      <div className="mb-2">
-        <div className="flex justify-between text-xs text-slate-600">
-          <span>{label}{sub ? ` — ${sub}` : ""}</span>
-          <span>{value}</span>
-        </div>
-        <div className="h-2 bg-slate-100 rounded">
-          <div className="h-full rounded bg-emerald-500" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-    );
-  }
+  // ======== Data สำหรับกราฟ ========
+  const statusPieData = useMemo(
+    () => STATUS_ORDER.map((s, i) => ({ name: STATUS_LABEL[s], value: kpi.byStatus[s], color: COLORS[i % COLORS.length] })),
+    [kpi.byStatus]
+  );
+  const priorityBarData = useMemo(
+    () => PR_ORDER.map((p, i) => ({ name: p.toUpperCase(), จำนวน: kpi.byPriority[p], color: COLORS[(i+1) % COLORS.length] })),
+    [kpi.byPriority]
+  );
+  // กราฟแนวโน้มงานตามวัน (จำนวนงานที่มี due/วัน ในเดือนที่เลือก)
+  const trendData = useMemo(() => {
+    const map = new Map<string, number>();
+    monthFiltered.forEach(t => {
+      if (!t.due_at) return;
+      const d = new Date(t.due_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return Array.from(map.entries())
+      .sort((a,b) => a[0].localeCompare(b[0]))
+      .map(([date, count]) => ({ date, count }));
+  }, [monthFiltered]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
         <div className="mx-auto max-w-screen-2xl px-4 h-14 flex items-center gap-4">
           <div className="font-semibold text-slate-800">mdes-task-bot — Dashboard</div>
@@ -175,51 +179,39 @@ export default function LiffDashboardPage() {
             <a className="hover:text-slate-900" href="/liff/kanban">Kanban</a>
             <a className="text-slate-900 border-b-2 border-emerald-500" href="/liff/dashboard">Dashboard</a>
           </nav>
-          <a
-            href="/liff"
-            className="md:hidden ml-auto inline-flex items-center justify-center rounded px-3 py-2 bg-emerald-600 text-white"
-          >
-            Tasks
-          </a>
+          <a href="/liff" className="md:hidden ml-auto inline-flex items-center justify-center rounded px-3 py-2 bg-emerald-600 text-white">Tasks</a>
         </div>
       </header>
 
       <main className="flex-1 mx-auto max-w-screen-2xl px-4 py-6 md:py-8">
-        {/* LIFF SDK (สำหรับอ่าน groupId อัตโนมัติเมื่อเปิดใน LINE) */}
         <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
 
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4 mb-5">
           <div className="md:col-span-2">
             <label className="text-sm text-slate-700">Group ID</label>
-            <input className="mt-1 w-full border border-slate-200 rounded px-3 py-2"
-                   value={groupId} onChange={e=>setGroupId(e.target.value)} placeholder="ใส่หรือเปิดจาก LIFF" />
+            <input className="mt-1 w-full border border-slate-200 rounded px-3 py-2" value={groupId} onChange={e=>setGroupId(e.target.value)} />
           </div>
           <div className="md:col-span-2">
             <label className="text-sm text-slate-700">Admin Key</label>
-            <input className="mt-1 w-full border border-slate-200 rounded px-3 py-2"
-                   value={adminKey} onChange={e=>setAdminKey(e.target.value)} placeholder="ADMIN_KEY" />
+            <input className="mt-1 w-full border border-slate-200 rounded px-3 py-2" value={adminKey} onChange={e=>setAdminKey(e.target.value)} />
           </div>
           <div>
             <label className="text-sm text-slate-700">เดือน</label>
-            <input type="month" className="mt-1 w-full border border-slate-200 rounded px-3 py-2"
-                   value={month} onChange={e=>setMonth(e.target.value)} />
+            <input type="month" className="mt-1 w-full border border-slate-200 rounded px-3 py-2" value={month} onChange={e=>setMonth(e.target.value)} />
           </div>
           <div className="md:col-span-3">
             <label className="text-sm text-slate-700">ค้นหา</label>
-            <input className="mt-1 w-full border border-slate-200 rounded px-3 py-2"
-                   value={q} onChange={e=>setQ(e.target.value)} placeholder="คำค้น, tag, @ชื่อ ฯลฯ" />
+            <input className="mt-1 w-full border border-slate-200 rounded px-3 py-2" value={q} onChange={e=>setQ(e.target.value)} />
           </div>
           <div className="flex items-end gap-2">
-            <button className="px-3 py-2 rounded bg-slate-800 text-white" onClick={load} disabled={loading}>
-              {loading ? "กำลังโหลด..." : "รีเฟรช"}
-            </button>
-            <a className="px-3 py-2 rounded bg-emerald-600 text-white" href={`/liff?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`}>ไปหน้า Tasks</a>
-            <a className="px-3 py-2 rounded bg-emerald-700 text-white" href={`/liff/kanban?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`}>ไปหน้า Kanban</a>
+            <button className="px-3 py-2 rounded bg-slate-800 text-white" onClick={load} disabled={loading}>{loading ? "กำลังโหลด..." : "รีเฟรช"}</button>
+            <a className="px-3 py-2 rounded bg-emerald-600 text-white" href={`/liff?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`}>Tasks</a>
+            <a className="px-3 py-2 rounded bg-emerald-700 text-white" href={`/liff/kanban?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`}>Kanban</a>
           </div>
         </div>
 
-        {/* KPI Cards */}
+        {/* KPI */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4 mb-6">
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="text-sm text-slate-600">งานทั้งหมด</div>
@@ -247,23 +239,60 @@ export default function LiffDashboardPage() {
           </div>
         </div>
 
-        {/* Charts (bar) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* ===== Charts ===== */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {/* Pie: สถานะ */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">สถานะ (จำนวนงาน)</div>
-            {STATUS_ORDER.map(s => (
-              <Bar key={s} value={kpi.byStatus[s]} max={Math.max(...STATUS_ORDER.map(x => kpi.byStatus[x]), 1)} label={STATUS_LABEL[s]} />
-            ))}
+            <div className="mb-3 font-semibold text-slate-800">สัดส่วนตามสถานะ</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={90} label>
+                    {statusPieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
+
+          {/* Bar: ความสำคัญ */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">ความสำคัญ (จำนวนงาน)</div>
-            {PR_ORDER.map((p) => (
-              <Bar key={p} value={kpi.byPriority[p]} max={Math.max(...PR_ORDER.map(x => kpi.byPriority[x]), 1)} label={p.toUpperCase()} />
-            ))}
+            <div className="mb-3 font-semibold text-slate-800">จำนวนงานตามความสำคัญ</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={priorityBarData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="จำนวน">
+                    {priorityBarData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Line: แนวโน้มงานตามวัน */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="mb-3 font-semibold text-slate-800">แนวโน้มจำนวนงาน (ตาม due date รายวัน)</div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="#0ea5e9" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        {/* Lists: ใกล้กำหนด & เลยกำหนด */}
+        {/* Lists */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="mb-3 font-semibold text-slate-800">ใกล้ครบกำหนด (3 วัน)</div>
