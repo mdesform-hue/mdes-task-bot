@@ -51,11 +51,25 @@ function startOfDay(d = new Date()) { return new Date(d.getFullYear(), d.getMont
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 const COLORS = ["#22c55e", "#0ea5e9", "#ef4444", "#16a34a", "#94a3b8"];
 const STATUS_COLOR: Record<Status, string> = {
-  todo: "#6b7280",
-  in_progress: "#0ea5e9",
-  blocked: "#ef4444",
-  done: "#22c55e",
-  cancelled: "#a855f7",
+  todo: "#3b82f6",       
+  in_progress: "#f59e0b", 
+  blocked: "#ef4444",     
+  done: "#22c55e",        
+  cancelled: "#9ca3af",   
+};
+
+const PRIORITY_LABEL: Record<Priority, string> = {
+  urgent: "ด่วนมาก",
+  high: "สูง",
+  medium: "ปานกลาง",
+  low: "ต่ำ",
+};
+
+const PRIORITY_COLOR: Record<Priority, string> = {
+  urgent: "#ef4444", // แดง
+  high:   "#f59e0b", // เหลืองส้ม
+  medium: "#0ea5e9", // ฟ้า
+  low:    "#22c55e", // เขียว
 };
 
 export default function LiffDashboardPage() {
@@ -162,10 +176,15 @@ const statusPieData = useMemo(
   })),
   [kpi.byStatus]
 );
-  const priorityBarData = useMemo(
-    () => PR_ORDER.map((p, i) => ({ name: p.toUpperCase(), จำนวน: kpi.byPriority[p], color: COLORS[(i+1) % COLORS.length] })),
-    [kpi.byPriority]
-  );
+const priorityBarData = useMemo(
+  () =>
+    PR_ORDER.map((p) => ({
+      key: p,                               // เก็บ priority เดิมไว้
+      name: PRIORITY_LABEL[p],              // แสดงชื่อไทย
+      จำนวน: kpi.byPriority[p],
+    })),
+  [kpi.byPriority]
+);
   // กราฟแนวโน้มงานตามวัน (จำนวนงานที่มี due/วัน ในเดือนที่เลือก)
   const trendData = useMemo(() => {
     const map = new Map<string, number>();
@@ -274,17 +293,19 @@ const statusPieData = useMemo(
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="mb-3 font-semibold text-slate-800">จำนวนงานตามความสำคัญ</div>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={priorityBarData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
+            <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={priorityBarData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Bar dataKey="จำนวน">
-                    {priorityBarData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                        {priorityBarData.map((e, i) => (
+        <Cell key={i} fill={PRIORITY_COLOR[e.key as Priority]} />
+      ))}
+    </Bar>
+  </BarChart>
+</ResponsiveContainer>
             </div>
           </div>
 
