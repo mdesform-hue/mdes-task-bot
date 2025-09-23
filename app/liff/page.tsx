@@ -269,9 +269,9 @@ export default function LiffAdminPage() {
         <div className="w-full px-4 md:px-8 h-14 flex items-center gap-4">
           <div className="font-semibold text-slate-800">mdes-task-bot — LIFF Admin</div>
           <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600">
-            <a className="hover:text-slate-900" href="/liff">Tasks</a>
+            <a className="text-slate-900 border-b-2 border-emerald-500" href="/liff">Tasks</a>
             <a className="hover:text-slate-900" href="/liff/kanban">Kanban</a>
-            <a className="text-slate-900 border-b-2 border-emerald-500" href="/liff/dashboard">Dashboard</a>
+            <a className="hover:text-slate-900" href="/liff/dashboard">Dashboard</a>
           </nav>
           <a
             href="/liff/kanban"
