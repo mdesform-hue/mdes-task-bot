@@ -1,50 +1,44 @@
 // lib/ai_parser.ts
-import { OpenAI } from "openai";
+import OpenAI from "openai";
 
 const apiKey = process.env.OPENAI_API_KEY;
 
-const structuredSchema = {
-  name: "ScheduleIntent",
-  schema: {
-    type: "object",
-    properties: {
-      intent: { type: "string", enum: ["schedule", "add_task", "help", "none"] },
-      title: { type: "string" },
-      when: {
-        anyOf: [
-          {
-            type: "object",
-            properties: {
-              kind: { type: "string", const: "timed" },
-              startISO: { type: "string" },
-              endISO: { type: "string" }
-            },
-            required: ["kind", "startISO", "endISO"]
+const schema = {
+  type: "object",
+  properties: {
+    intent: { type: "string", enum: ["schedule", "add_task", "help", "none"] },
+    title: { type: "string" },
+    when: {
+      anyOf: [
+        {
+          type: "object",
+          properties: {
+            kind: { type: "string", const: "timed" },
+            startISO: { type: "string" },
+            endISO: { type: "string" }
           },
-          {
-            type: "object",
-            properties: {
-              kind: { type: "string", const: "allday" },
-              startDate: { type: "string" },
-              endDate: { type: "string" }
-            },
-            required: ["kind", "startDate", "endDate"]
-          }
-        ]
-      },
-      attendees: { type: "array", items: { type: "string" }, default: [] },
-      notes: { type: "string", default: "" }
+          required: ["kind", "startISO", "endISO"]
+        },
+        {
+          type: "object",
+          properties: {
+            kind: { type: "string", const: "allday" },
+            startDate: { type: "string" },
+            endDate: { type: "string" }
+          },
+          required: ["kind", "startDate", "endDate"]
+        }
+      ]
     },
-    required: ["intent", "title"],
-    additionalProperties: false
+    attendees: { type: "array", items: { type: "string" }, default: [] },
+    notes: { type: "string", default: "" }
   },
-  strict: true
+  required: ["intent", "title"],
+  additionalProperties: false
 } as const;
 
 let client: OpenAI | null = null;
-if (apiKey) {
-  client = new OpenAI({ apiKey });
-}
+if (apiKey) client = new OpenAI({ apiKey });
 
 export async function parseLineTextToJson(inputText: string) {
   if (!client) {
@@ -63,20 +57,15 @@ export async function parseLineTextToJson(inputText: string) {
     "ถ้าตีความไม่ได้ → intent = none และใส่ notes"
   ].join("\n");
 
-  const resp = await client.responses.create({
+  // v5: responses.parse จะรีเทิร์นเป็นอ็อบเจ็กต์ที่ parse แล้วตาม schema
+  const parsed = await client.responses.parse({
     model: "gpt-4.1-mini",
     input: [
       { role: "system", content: system },
       { role: "user", content: `ข้อความจากผู้ใช้ (LINE): """${inputText}"""` }
     ],
-    response_format: { type: "json_schema", json_schema: structuredSchema }
+    schema
   });
 
-  const item = (resp as any)?.output?.[0]?.content?.[0];
-  const jsonStr = item?.text ?? JSON.stringify(item?.json ?? {});
-  try {
-    return JSON.parse(jsonStr);
-  } catch {
-    return item?.json ?? { intent: "none", title: "งานใหม่", notes: "parse_error" };
-  }
+  return parsed as any;
 }
