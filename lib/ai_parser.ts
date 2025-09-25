@@ -69,7 +69,6 @@ if (apiKey) client = new OpenAI({ apiKey });
 
 // --------- Utilities ---------
 function nowInBangkokISOForPrompt(): string {
-  // ให้โมเดลรู้ "ตอนนี้" ในไทม์โซนกรุงเทพ เพื่อคำนวณคำอย่าง "วันนี้/พรุ่งนี้/วันศุกร์"
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -85,7 +84,6 @@ function extractEmailsFallback(text: string): string[] {
   for (const m of text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)) {
     picked.add(m[0]);
   }
-  // email=a@b.com รูปแบบพิเศษ
   const p = /email\s*=\s*([^\s|,;]+)/i.exec(text)?.[1];
   if (p) picked.add(p);
   return Array.from(picked);
@@ -101,7 +99,6 @@ export async function parseLineTextToJson(inputText: string): Promise<ParsedAIRe
 
   const nowBkk = nowInBangkokISOForPrompt();
 
-  // คำสั่งระบบ (system) เพื่อกำกับให้ตีความข้อความไทยเป็น JSON ตาม schema
   const system = [
     "คุณคือตัวแยกคำสั่งภาษาไทย สำหรับลงตาราง/สร้างงาน",
     `ตอนนี้ (ปัจจุบัน) คือ ${nowBkk} ในไทม์โซน Asia/Bangkok (+07:00).`,
@@ -115,9 +112,8 @@ export async function parseLineTextToJson(inputText: string): Promise<ParsedAIRe
     "7) ตอบเป็น JSON ตาม schema เท่านั้น ห้ามเพิ่มข้อความอื่น"
   ].join("\n");
 
-  // เรียก Responses API (v5) และบังคับสคีมาด้วย responses.parse
   const parsed = await client.responses.parse({
-    model: "gpt-4.1-mini", // เร็ว/คุ้มราคา; จะใช้รุ่นอื่นได้ตามต้องการ
+    model: "gpt-4.1-mini",
     input: [
       { role: "system", content: system },
       { role: "user", content: `ข้อความจากผู้ใช้ (LINE): """${inputText}"""` }
@@ -125,29 +121,18 @@ export async function parseLineTextToJson(inputText: string): Promise<ParsedAIRe
     schema
   });
 
-  // typesafe ตาม schema ที่กำหนด
   const out = parsed as unknown as ParsedAIResult;
 
-  // ---------- เสริมความทนทาน (hardening) ----------
-  // 1) เติม attendees ถ้าโมเดลมองไม่เห็น แต่ฝั่งข้อความมี
-  if (!out.attendees || !Array.isArray(out.attendees)) {
-    out.attendees = [];
-  }
-  const fallbackEmails = extractEmailsFallback(inputText);
-  for (const e of fallbackEmails) {
+  // เติม/ปรับข้อมูลให้ทนทานขึ้น
+  if (!out.attendees || !Array.isArray(out.attendees)) out.attendees = [];
+  for (const e of extractEmailsFallback(inputText)) {
     if (!out.attendees.includes(e)) out.attendees.push(e);
   }
-
-  // 2) ถ้าโมเดลลืมใส่ when สำหรับ schedule → บังคับ none + notes
   if (out.intent === "schedule" && !out.when) {
     out.intent = "none";
     out.notes = (out.notes ? out.notes + " | " : "") + "missing_when_for_schedule";
   }
-
-  // 3) ป้องกันค่าผิดพลาด
-  if (!out.title || typeof out.title !== "string") {
-    out.title = "งานใหม่";
-  }
+  if (!out.title || typeof out.title !== "string") out.title = "งานใหม่";
   if (!out.notes) out.notes = "";
 
   return out;
