@@ -1,19 +1,18 @@
-// app/api/line/webhook/route.t
+// app/api/line/webhook/route.ts
 export const runtime = "nodejs";
 
 import crypto from "crypto";
 import { sql } from "../../../../lib/db";
 import { createCalendarEvent } from "../../../../lib/gcal";
-import { parseLineTextToJson } from "../../../../lib/ai_parser"; // 👈 เพิ่มการเรียก AI
+import { parseLineTextToJson } from "../../../../lib/ai_parser";
 
-// ---------- CONFIG ----------
 const TZ = "Asia/Bangkok";
 
 // ---------- Healthcheck ----------
 export async function GET() { return new Response("ok", { status: 200 }); }
 export async function HEAD() { return new Response(null, { status: 200 }); }
 
-// ---------- Small helpers ----------
+// ---------- Helpers ----------
 function fmtDate(d: string | Date) {
   const dt = typeof d === "string" ? new Date(d) : d;
   return new Intl.DateTimeFormat("th-TH", {
@@ -27,7 +26,6 @@ function fmtThaiDateOnly(dateStr: string) {
     timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit"
   }).format(dt);
 }
-
 async function reply(replyToken: string, message: any) {
   await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
@@ -38,7 +36,6 @@ async function reply(replyToken: string, message: any) {
     body: JSON.stringify({ replyToken, messages: [message] }),
   });
 }
-
 function helpText(gid?: string) {
   const lines = [
     "🧭 คำสั่งที่ใช้ได้:",
@@ -260,31 +257,62 @@ export async function POST(req: Request) {
     // ---- AI branch: ให้ AI วิเคราะห์ทุกอย่างเมื่อเริ่มด้วย "ai "
     if (/^ai\s+/i.test(text)) {
       try {
-        // เรียก AI ให้แปลงข้อความเป็น JSON ตาม schema
-        const parsed = await parseLineTextToJson(text);
+        // 1) เรียก AI ให้แปลงข้อความเป็น JSON ตาม schema
+        let parsed;
+        try {
+          parsed = await parseLineTextToJson(text);
+        } catch (e: any) {
+          if (e?.code === "OPENAI_API_KEY_MISSING") {
+            await reply(ev.replyToken, {
+              type: "text",
+              text:
+                "ยังไม่ได้ตั้งค่า OPENAI_API_KEY ครับ 🔑\n" +
+                "ให้ผู้ดูแลเพิ่มตัวแปรแวดล้อม OPENAI_API_KEY แล้วลองใหม่อีกครั้ง"
+            });
+            continue;
+          }
+          console.error("OPENAI_PARSE_ERR", e);
+          await reply(ev.replyToken, {
+            type: "text",
+            text:
+              "ขออภัยครับ ระบบวิเคราะห์ข้อความไม่สำเร็จ (AI error)\n" +
+              "ลองพิมพ์ใหม่อีกครั้ง หรือระบุรูปแบบเวลาให้ชัดเจน เช่น วันนี้ 15:00 / พรุ่งนี้ 09:30"
+          });
+          continue;
+        }
+
         const intent = parsed?.intent ?? "none";
         const title  = (parsed?.title ?? "").trim() || "งานใหม่";
         const when   = parsed?.when ?? null;
         const emails = Array.isArray(parsed?.attendees) ? parsed.attendees : [];
+        const debug  = process.env.DEBUG_BOT === "1";
 
         // ensure group
         await sql/* sql */`
           insert into public.groups (id) values (${groupId})
           on conflict (id) do nothing`;
 
-        // ตอบ help
+        // DEBUG: ส่ง JSON ที่ AI คืน (ตั้ง DEBUG_BOT=1 ใน Env)
+        if (debug) {
+          await reply(ev.replyToken, {
+            type: "text",
+            text: `🧪 DEBUG AI JSON:\n${JSON.stringify(parsed, null, 2)}`
+          });
+        }
+
+        // help
         if (intent === "help") {
           await reply(ev.replyToken, { type: "text", text: helpText(groupId) });
           continue;
         }
 
-        // ลงตาราง (schedule)
+        // schedule
         if (intent === "schedule") {
           if (!when) {
             await reply(ev.replyToken, {
               type: "text",
               text:
-                "ขอเวลาให้ชัดเจนหน่อยครับ ⏰\nเช่น:\n" +
+                "ขอเวลาให้ชัดเจนหน่อยครับ ⏰\nตัวอย่าง:\n" +
                 "• ai ลงตาราง ทดสอบ วันนี้ 15:00\n" +
                 "• ai ลงตาราง ประชุม พรุ่งนี้ 09.30\n" +
                 "• ai ลงตาราง แจ้งข่าว due=2025-09-30 time=14:00"
@@ -292,50 +320,70 @@ export async function POST(req: Request) {
             continue;
           }
 
-          // ป้องกันเวลาย้อนหลัง (เฉพาะ kind=timed)
           if (when.kind === "timed") {
-            const now = new Date(); // ใช้ epoch ปัจจุบันเทียบกับ startISO ซึ่งเป็น UTC string
-            const start = new Date(when.startISO);
+            const now = new Date();
+            const start = new Date((when as any).startISO);
+            if (!isFinite(start.getTime())) {
+              await reply(ev.replyToken, {
+                type: "text",
+                text: "รูปแบบเวลาไม่ถูกต้องครับ ลองพิมพ์ใหม่ เช่น วันนี้ 15:00 หรือ พรุ่งนี้ 09:30"
+              });
+              continue;
+            }
             if (start.getTime() <= now.getTime()) {
               await reply(ev.replyToken, {
                 type: "text",
-                text:
-                  "เวลาที่ระบุผ่านมาแล้วครับ ⏰\nลองใส่เวลาในอนาคต เช่น วันนี้ 15:00 หรือ พรุ่งนี้ 09:30"
+                text: "เวลาที่ระบุผ่านมาแล้วครับ ⏰\nลองใส่เวลาในอนาคต เช่น วันนี้ 15:00 หรือ พรุ่งนี้ 09:30"
               });
               continue;
             }
           }
 
-          // เรียก Calendar + สร้าง Task
+          // ลง Calendar + สร้าง Task (ถ้า calendar พัง → ยังสร้าง Task แล้วแจ้ง)
           let dueAtISO: string | null = null;
           let descNote = `สร้างจาก LINE group ${groupId}`;
           let calendarMsg = "";
+          let calendarOk = true;
+          let calendarErrMsg = "";
 
           if (when.kind === "timed") {
-            dueAtISO = when.startISO;
-            calendarMsg = `• เวลา: ${fmtDate(when.startISO)} - ${fmtDate(when.endISO)}`;
-            await createCalendarEvent({
-              title,
-              startISO: when.startISO,
-              endISO: when.endISO,
-              attendees: emails,
-              description: `${descNote}`,
-            } as any);
+            dueAtISO = (when as any).startISO;
+            calendarMsg = `• เวลา: ${fmtDate((when as any).startISO)} - ${fmtDate((when as any).endISO)}`;
+            try {
+              await createCalendarEvent({
+                title,
+                startISO: (when as any).startISO,
+                endISO: (when as any).endISO,
+                attendees: emails,
+                description: `${descNote}`,
+              } as any);
+            } catch (ce: any) {
+              calendarOk = false;
+              calendarErrMsg = String(ce?.message ?? ce);
+              console.error("GCAL_ERR", ce);
+            }
           } else {
-            // allday
-            dueAtISO = new Date(`${when.startDate}T00:00:00+07:00`).toISOString();
+            const startDate = (when as any).startDate;
+            const endDate   = (when as any).endDate;
+            dueAtISO = new Date(`${startDate}T00:00:00+07:00`).toISOString();
             descNote = `[ALL_DAY] ${descNote}`;
-            calendarMsg = when.startDate === when.endDate
-              ? `• เวลา: ทั้งวัน ${fmtThaiDateOnly(when.startDate)}`
-              : `• เวลา: ทั้งวัน ${fmtThaiDateOnly(when.startDate)} - ${fmtThaiDateOnly(when.endDate)}`;
-            await createCalendarEvent({
-              title,
-              allDay: true,
-              startDate: when.startDate,
-              endDate: when.endDate,
-              attendees: emails,
-              description: `${descNote}`,
-            } as any);
+            calendarMsg = startDate === endDate
+              ? `• เวลา: ทั้งวัน ${fmtThaiDateOnly(startDate)}`
+              : `• เวลา: ทั้งวัน ${fmtThaiDateOnly(startDate)} - ${fmtThaiDateOnly(endDate)}`;
+            try {
+              await createCalendarEvent({
+                title,
+                allDay: true,
+                startDate,
+                endDate,
+                attendees: emails,
+                description: `${descNote}`,
+              } as any);
+            } catch (ce: any) {
+              calendarOk = false;
+              calendarErrMsg = String(ce?.message ?? ce);
+              console.error("GCAL_ERR", ce);
+            }
           }
 
           const ins = await sql/* sql */`
@@ -349,26 +397,29 @@ export async function POST(req: Request) {
             )
             returning code`;
 
+          const baseMsg =
+            `• เรื่อง: ${title}\n` +
+            `${calendarMsg}` +
+            (emails.length ? `\n• เชิญ: ${emails.join(", ")}` : "") +
+            `\n• code: ${ins[0].code}`;
+
           await reply(ev.replyToken, {
             type: "text",
-            text:
-              `📅 ลงตารางแล้ว\n` +
-              `• เรื่อง: ${title}\n` +
-              `${calendarMsg}` +
-              (emails.length ? `\n• เชิญ: ${emails.join(", ")}` : "") +
-              `\n• code: ${ins[0].code}`
+            text: calendarOk
+              ? `📅 ลงตารางแล้ว\n${baseMsg}`
+              : `⚠️ ลงตารางไม่สำเร็จ (จะลองใหม่อีกครั้งได้)\nสาเหตุ: ${calendarErrMsg}\n\nอย่างไรก็ดี ผมได้สร้างงานให้แล้วนะครับ\n${baseMsg}`
           });
           continue;
         }
 
-        // เพิ่มงาน (add_task)
+        // add_task
         if (intent === "add_task") {
           let dueISO: string | null = null;
           let descForTask: string | null = null;
           if (when?.kind === "timed") {
-            dueISO = when.startISO;
+            dueISO = (when as any).startISO;
           } else if (when?.kind === "allday") {
-            dueISO = new Date(`${when.startDate}T00:00:00+07:00`).toISOString();
+            dueISO = new Date(`${(when as any).startDate}T00:00:00+07:00`).toISOString();
             descForTask = "[ALL_DAY]";
           }
 
@@ -395,12 +446,15 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // none → ไม่ตอบ (ตาม requirement เดิม)
+        // none → เงียบ
         continue;
+
       } catch (e:any) {
-        console.error("AI_INTENT_ERR", e);
-        await reply(ev.replyToken, { type: "text", text:
-          "ดำเนินการไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูตัวอย่างคำสั่ง" });
+        console.error("AI_BRANCH_FATAL", e);
+        await reply(ev.replyToken, {
+          type: "text",
+          text: "ดำเนินการไม่สำเร็จ ลองใหม่อีกครั้ง หรือพิมพ์ help เพื่อดูตัวอย่างคำสั่ง"
+        });
       }
       continue;
     }
