@@ -1,5 +1,6 @@
 // lib/ai_parser.ts
 // ใช้กับ openai@^5; ถ้า AI ล้มเหลว จะ fallback เป็นพาร์เซอร์ภายในทันที
+// อัปเดต: รองรับ "ศุกร์ที่ 26 15.00" และลบ token วัน/ที่/วันที่/เวลา ออกจาก title ให้สะอาด
 
 import OpenAI from "openai";
 
@@ -49,6 +50,11 @@ function nextWeekday(base: Date, targetDow: number) {
   d.setDate(d.getDate() + add);
   return d;
 }
+function endDateFromStartDate(startDate: string) {
+  const e = new Date(`${startDate}T00:00:00+07:00`);
+  e.setDate(e.getDate() + 1);
+  return `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`;
+}
 
 // --------- ดึงอีเมลแบบ fallback ---------
 function extractEmails(text: string): string[] {
@@ -68,28 +74,77 @@ function localFallbackParse(inputText: string): ParsedAIResult {
   const base = nowBkk();
   const { y, m, d } = ymd(base);
 
-  // เวลา: วันนี้ / พรุ่งนี้ / วันศุกร์ (วันในสัปดาห์)
+  // เวลา: วันนี้ / พรุ่งนี้ / วันในสัปดาห์ (รวม "ศุกร์ที่ 26 15.00")
   let when: ParsedWhen | null = null;
 
-  // 1) วันนี้ HH(.|:)MM? | วันนี้ HH โมง
-  let mt = text.match(/วันนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/i);
-  if (mt) {
-    const hh = Math.max(0, Math.min(23, parseInt(mt[1], 10)));
-    const mm = mt[2] ? Math.max(0, Math.min(59, parseInt(mt[2], 10))) : 0;
-    const startISO = toISOAtBkk(y, m, d, hh, mm);
-    const endISO = addMinutesISO(startISO, 60);
-    when = { kind: "timed", startISO, endISO };
-  } else if (/วันนี้/i.test(text)) {
-    // วันนี้ทั้งวัน
-    const startDate = `${y}-${pad2(m)}-${pad2(d)}`;
-    const e = new Date(`${startDate}T00:00:00+07:00`); e.setDate(e.getDate() + 1);
-    const endDate = `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`;
-    when = { kind: "allday", startDate, endDate };
+  // 0) รูปแบบ “วัน(…)(ที่)? <dd> <HH[:|.]mm>?”  เช่น "ศุกร์ที่ 26 15.00", "วันศุกร์ 26 9:30"
+  if (!when) {
+    const mwx = text.match(
+      /(?:วัน)?(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)(?:ที่)?(?:\s+(\d{1,2}))?(?:\s+(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?)?/i
+    );
+    if (mwx) {
+      const dowName = mwx[1];
+      const ddGiven = mwx[2] ? Math.max(1, Math.min(31, parseInt(mwx[2], 10))) : null;
+      const hhGiven = mwx[3] ? Math.max(0, Math.min(23, parseInt(mwx[3], 10))) : null;
+      const mmGiven = mwx[4] ? Math.max(0, Math.min(59, parseInt(mwx[4], 10))) : 0;
+
+      if (ddGiven !== null) {
+        // มีระบุ "วันที่" ชัดเจน → ใช้วันนั้นใน "เดือนปัจจุบัน"; ถ้าผ่านไปแล้ว ให้เลื่อนไปเดือนถัดไป
+        let target = new Date(`${y}-${pad2(m)}-${pad2(ddGiven)}T00:00:00+07:00`);
+        const todayYMD = new Date(`${y}-${pad2(m)}-${pad2(d)}T00:00:00+07:00`);
+        if (target < todayYMD) {
+          // ข้ามไปเดือนถัดไป (อย่างง่าย)
+          const ny = m === 12 ? y + 1 : y;
+          const nm = m === 12 ? 1 : m + 1;
+          target = new Date(`${ny}-${pad2(nm)}-${pad2(ddGiven)}T00:00:00+07:00`);
+        }
+        const { y: ty, m: tm, d: td } = ymd(target);
+        if (hhGiven !== null) {
+          const startISO = toISOAtBkk(ty, tm, td, hhGiven, mmGiven);
+          const endISO = addMinutesISO(startISO, 60);
+          when = { kind: "timed", startISO, endISO };
+        } else {
+          const startDate = `${ty}-${pad2(tm)}-${pad2(td)}`;
+          const endDate = endDateFromStartDate(startDate);
+          when = { kind: "allday", startDate, endDate };
+        }
+      } else {
+        // ไม่มี "วันที่" → ใช้สัปดาห์ถัดไปตามวันในสัปดาห์
+        const dow = WEEKIDX[dowName];
+        const day = nextWeekday(base, dow);
+        const { y: y2, m: m2, d: d2 } = ymd(day);
+        if (hhGiven !== null) {
+          const startISO = toISOAtBkk(y2, m2, d2, hhGiven, mmGiven);
+          const endISO = addMinutesISO(startISO, 60);
+          when = { kind: "timed", startISO, endISO };
+        } else {
+          const startDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
+          const endDate = endDateFromStartDate(startDate);
+          when = { kind: "allday", startDate, endDate };
+        }
+      }
+    }
+  }
+
+  // 1) วันนี้ HH(.|:)MM? | วันนี้ HH โมง | วันนี้ ทั้งวัน
+  if (!when) {
+    const mt = text.match(/วันนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/i);
+    if (mt) {
+      const hh = Math.max(0, Math.min(23, parseInt(mt[1], 10)));
+      const mm = mt[2] ? Math.max(0, Math.min(59, parseInt(mt[2], 10))) : 0;
+      const startISO = toISOAtBkk(y, m, d, hh, mm);
+      const endISO = addMinutesISO(startISO, 60);
+      when = { kind: "timed", startISO, endISO };
+    } else if (/วันนี้/i.test(text)) {
+      const startDate = `${y}-${pad2(m)}-${pad2(d)}`;
+      const endDate = endDateFromStartDate(startDate);
+      when = { kind: "allday", startDate, endDate };
+    }
   }
 
   // 2) พรุ่งนี้ HH(.|:)MM? | พรุ่งนี้ ทั้งวัน
   if (!when) {
-    let mt2 = text.match(/พรุ่งนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/i);
+    const mt2 = text.match(/พรุ่งนี้\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?/i);
     if (mt2) {
       const tmr = new Date(base); tmr.setDate(tmr.getDate() + 1);
       const { y: y1, m: m1, d: d1 } = ymd(tmr);
@@ -102,35 +157,12 @@ function localFallbackParse(inputText: string): ParsedAIResult {
       const tmr = new Date(base); tmr.setDate(tmr.getDate() + 1);
       const { y: y1, m: m1, d: d1 } = ymd(tmr);
       const startDate = `${y1}-${pad2(m1)}-${pad2(d1)}`;
-      const e = new Date(`${startDate}T00:00:00+07:00`); e.setDate(e.getDate() + 1);
-      const endDate = `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`;
+      const endDate = endDateFromStartDate(startDate);
       when = { kind: "allday", startDate, endDate };
     }
   }
 
-  // 3) วันในสัปดาห์ เช่น วันศุกร์ 15.00 / วันศุกร์ ทั้งวัน
-  if (!when) {
-    const mw = text.match(/วัน(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)(?:\s+(\d{1,2})(?:[:.](\d{2}))?\s*(?:น\.|โมง)?)?/i);
-    if (mw) {
-      const dow = WEEKIDX[mw[1]]; // 0..6
-      const day = nextWeekday(base, dow);
-      const { y: y2, m: m2, d: d2 } = ymd(day);
-      if (mw[2]) {
-        const hh = Math.max(0, Math.min(23, parseInt(mw[2], 10)));
-        const mm = mw[3] ? Math.max(0, Math.min(59, parseInt(mw[3], 10))) : 0;
-        const startISO = toISOAtBkk(y2, m2, d2, hh, mm);
-        const endISO = addMinutesISO(startISO, 60);
-        when = { kind: "timed", startISO, endISO };
-      } else {
-        const startDate = `${y2}-${pad2(m2)}-${pad2(d2)}`;
-        const e = new Date(`${startDate}T00:00:00+07:00`); e.setDate(e.getDate() + 1);
-        const endDate = `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`;
-        when = { kind: "allday", startDate, endDate };
-      }
-    }
-  }
-
-  // 4) "<วันที่เดือนนี้> HH(.|:)MM?" เช่น "27 15.00" | "<วันที่เดือนนี้> ทั้งวัน"
+  // 3) "<วันที่เดือนนี้> HH(.|:)MM?" เช่น "27 15.00" | "<วันที่เดือนนี้> ทั้งวัน"
   if (!when) {
     const md = text.match(/(^|\s)(\d{1,2})\s+(\d{1,2})(?:[:.](\d{2}))?(\s|$)/);
     if (md) {
@@ -145,14 +177,13 @@ function localFallbackParse(inputText: string): ParsedAIResult {
       if (mdAll) {
         const dd = Math.max(1, Math.min(31, parseInt(mdAll[2], 10)));
         const startDate = `${y}-${pad2(m)}-${pad2(dd)}`;
-        const e = new Date(`${startDate}T00:00:00+07:00`); e.setDate(e.getDate() + 1);
-        const endDate = `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`;
+        const endDate = endDateFromStartDate(startDate);
         when = { kind: "allday", startDate, endDate };
       }
     }
   }
 
-  // 5) due=YYYY-MM-DD [time=HH(:|.)MM]
+  // 4) due=YYYY-MM-DD [time=HH(:|.)MM]
   if (!when) {
     const due = /due=(\d{4}-\d{2}-\d{2})/i.exec(text)?.[1];
     const tim = /time=(\d{1,2})(?:[:.](\d{2}))?/i.exec(text);
@@ -165,24 +196,24 @@ function localFallbackParse(inputText: string): ParsedAIResult {
       when = { kind: "timed", startISO, endISO };
     } else if (due) {
       const startDate = due;
-      const e = new Date(`${startDate}T00:00:00+07:00`); e.setDate(e.getDate() + 1);
-      const endDate = `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`;
+      const endDate = endDateFromStartDate(startDate);
       when = { kind: "allday", startDate, endDate };
     }
   }
 
-  // Title: ตัด prefix/คำสั่ง/เวลาออกอย่างคร่าว ๆ
+  // Title: ตัด prefix/คำสั่ง/วัน/ที่/วันที่/เวลา/อีเมล ออกอย่างคร่าว ๆ
   let title = text
     .replace(/^ai\s*/i, "")
     .replace(/(?:^|\s)ลงตาราง(?:\s*เวลา)?\s*/i, " ")
-    .replace(/วันนี้\s*\d{1,2}(?:[:.]\d{2})?\s*(?:น\.|โมง)?/gi, " ")
-    .replace(/พรุ่งนี้\s*\d{1,2}(?:[:.]\d{2})?\s*(?:น\.|โมง)?/gi, " ")
-    .replace(/วัน(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)(?:\s+\d{1,2}(?:[:.]\d{2})?\s*(?:น\.|โมง)?)?/gi, " ")
+    // วันในสัปดาห์ (+คำว่า ที่) + วันที่ + เวลา
+    .replace(/(?:วัน)?(อาทิตย์|จันทร์|อังคาร|พุธ|พฤหัสบดี|พฤหัส|ศุกร์|เสาร์)(?:ที่)?/gi, " ")
+    .replace(/\bวันนี้\b/gi, " ")
+    .replace(/\bพรุ่งนี้\b/gi, " ")
     .replace(/(^|\s)(\d{1,2})\s+(\d{1,2})(?:[:.](\d{2}))?(\s|$)/g, " ")
     .replace(/(^|\s)(\d{1,2})\s*ทั้งวัน(\s|$)/g, " ")
-    .replace(/due=\d{4}-\d{2}-\d{2}/gi, " ")
-    .replace(/time=\d{1,2}(?:[:.]\d{2})?/gi, " ")
-    .replace(/email=[^\s|,;]+/gi, " ")
+    .replace(/\bdue=\d{4}-\d{2}-\d{2}\b/gi, " ")
+    .replace(/\btime=\d{1,2}(?:[:.]\d{2})?\b/gi, " ")
+    .replace(/\bemail=[^\s|,;]+\b/gi, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
   if (!title) title = "งานใหม่";
@@ -201,7 +232,7 @@ function localFallbackParse(inputText: string): ParsedAIResult {
 
 // --------- เรียก AI; ถ้า error จะ fallback อัตโนมัติ ---------
 export async function parseLineTextToJson(inputText: string): Promise<ParsedAIResult> {
-  // 1) ไม่มีคีย์ → ใช้ fallback ทันที (อย่าโยน error)
+  // 1) ไม่มีคีย์ → ใช้ fallback ทันที
   if (!client) {
     const out = localFallbackParse(inputText);
     out.notes = (out.notes ? out.notes + " | " : "") + "no_openai_key";
@@ -214,9 +245,9 @@ export async function parseLineTextToJson(inputText: string): Promise<ParsedAIRe
     `ไทม์โซนหลัก: ${TZ} (+07:00)`,
     "หน้าที่ของคุณ:",
     "• ถ้าเห็นคำว่า 'ลงตาราง' ให้ intent='schedule', ถ้าไม่เห็นให้ 'add_task'. ถ้าเป็นวิธีใช้ → 'help', ถ้าไม่เข้าใจ → 'none'.",
-    "• วิเคราะห์รูปแบบเวลาไทย วันนี้/พรุ่งนี้/วันในสัปดาห์/HH:MM/HH.MM/ทั้งวัน/due=YYYY-MM-DD[ time=HH:MM|HH.MM ]",
-    "• ถ้ากำหนดเวลาชัดเจน → when.kind='timed' พร้อม startISO/endISO (+07:00), ไม่ชัดเจนเวลา → 'allday' ด้วย startDate/endDate",
-    "• end ของ timed ให้ตั้ง +60 นาทีจาก start ถ้าไม่ได้กำหนด",
+    "• วิเคราะห์รูปแบบเวลาไทย วันนี้/พรุ่งนี้/วันในสัปดาห์/(เลขวันที่) HH:MM/HH.MM/ทั้งวัน/due=YYYY-MM-DD[ time=HH:MM|HH.MM ]",
+    "• สนับสนุนวลี 'ศุกร์ที่ 26 15.00' (มีคำว่า 'ที่' ระหว่างวันกับวันที่)",
+    "• ถ้าเป็น timed ตั้ง end = start + 60 นาที",
     "• ดึงอีเมลเป็น attendees[]",
     "• ตอบ JSON ตาม schema เท่านั้น",
   ].join("\n");
@@ -267,7 +298,6 @@ export async function parseLineTextToJson(inputText: string): Promise<ParsedAIRe
 
     const out = parsed as unknown as ParsedAIResult;
 
-    // แข็งแรงขึ้นนิดหน่อย
     if (!out.attendees || !Array.isArray(out.attendees)) out.attendees = [];
     for (const e of extractEmails(inputText)) if (!out.attendees.includes(e)) out.attendees.push(e);
     if (!out.title) out.title = "งานใหม่";
