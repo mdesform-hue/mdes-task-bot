@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     select group_id, cal1_id, cal1_tag, cal1_color,
            cal2_id, cal2_tag, cal2_color,
            since_month, tz, last_sync_at, created_at, updated_at
-    from public.group_calendar_settings
+    from public.calendar_configs
     where group_id=${group_id}
     limit 1`;
 
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest) {
     on conflict (id) do nothing`;
 
   const rows = await sql/* sql */`
-    insert into public.group_calendar_settings (
+    insert into public.calendar_configs (
       group_id, cal1_id, cal1_tag, cal1_color,
       cal2_id, cal2_tag, cal2_color,
       since_month, tz, updated_at
