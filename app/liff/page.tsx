@@ -42,6 +42,12 @@ const fmtDate = (iso: string | null) =>
 type Toast = { type: "ok" | "err"; text: string } | null;
 
 export default function LiffAdminPage() {
+  // state สำหรับ calendar config
+  const [cal1Id, setCal1Id] = useState("");
+  const [cal1Tag, setCal1Tag] = useState("CAL1");
+  const [cal2Id, setCal2Id] = useState("");
+  const [cal2Tag, setCal2Tag] = useState("CAL2");
+  const [cfgLoading, setCfgLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
@@ -153,7 +159,68 @@ export default function LiffAdminPage() {
     const d = draft[item.id] || {};
     return { ...item, ...d, ...patch };
   }
+// โหลด config เมื่อพร้อมและมี groupId/adminKey
+useEffect(() => {
+  (async () => {
+    if (!ready || !groupId || !adminKey) return;
+    try {
+      setCfgLoading(true);
+      const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`);
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      setCal1Id(j.cal1_id ?? "");
+      setCal1Tag(j.cal1_tag ?? "CAL1");
+      setCal2Id(j.cal2_id ?? "");
+      setCal2Tag(j.cal2_tag ?? "CAL2");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCfgLoading(false);
+    }
+  })();
+}, [ready, groupId, adminKey]);
 
+async function saveCalendarConfig() {
+  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+  try {
+    setCfgLoading(true);
+    const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cal1_id: cal1Id || null,
+        cal1_tag: cal1Tag || "CAL1",
+        cal2_id: cal2Id || null,
+        cal2_tag: cal2Tag || "CAL2",
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    alert("บันทึก Calendar IDs เรียบร้อย");
+  } catch (e: any) {
+    alert(`บันทึกไม่สำเร็จ: ${e.message || e}`);
+  } finally {
+    setCfgLoading(false);
+  }
+}
+
+async function syncNow() {
+  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+  try {
+    setCfgLoading(true);
+    const r = await fetch(`/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
+      method: "POST",
+    });
+    const txt = await r.text();
+    if (!r.ok) throw new Error(txt);
+    alert(txt || "ซิงค์เสร็จแล้ว");
+    // โหลด tasks อีกรอบ เผื่อมีงานใหม่จาก calendar
+    await load();
+  } catch (e: any) {
+    alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
+  } finally {
+    setCfgLoading(false);
+  }
+}
   const saveRow = async (id: string, extra?: Partial<Task>) => {
     const body = { ...(draft[id] || {}), ...(extra || {}) };
     if (!Object.keys(body).length) return;
@@ -302,6 +369,76 @@ export default function LiffAdminPage() {
   }, [items]);
   const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(firstOfMonth);
   const todayKey = keyFromDate(new Date());
+
+  // state สำหรับ calendar config
+const [cal1Id, setCal1Id] = useState("");
+const [cal1Tag, setCal1Tag] = useState("CAL1");
+const [cal2Id, setCal2Id] = useState("");
+const [cal2Tag, setCal2Tag] = useState("CAL2");
+const [cfgLoading, setCfgLoading] = useState(false);
+
+// โหลด config เมื่อพร้อมและมี groupId/adminKey
+useEffect(() => {
+  (async () => {
+    if (!ready || !groupId || !adminKey) return;
+    try {
+      setCfgLoading(true);
+      const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`);
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      setCal1Id(j.cal1_id ?? "");
+      setCal1Tag(j.cal1_tag ?? "CAL1");
+      setCal2Id(j.cal2_id ?? "");
+      setCal2Tag(j.cal2_tag ?? "CAL2");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCfgLoading(false);
+    }
+  })();
+}, [ready, groupId, adminKey]);
+
+async function saveCalendarConfig() {
+  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+  try {
+    setCfgLoading(true);
+    const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cal1_id: cal1Id || null,
+        cal1_tag: cal1Tag || "CAL1",
+        cal2_id: cal2Id || null,
+        cal2_tag: cal2Tag || "CAL2",
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    alert("บันทึก Calendar IDs เรียบร้อย");
+  } catch (e: any) {
+    alert(`บันทึกไม่สำเร็จ: ${e.message || e}`);
+  } finally {
+    setCfgLoading(false);
+  }
+}
+
+async function syncNow() {
+  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+  try {
+    setCfgLoading(true);
+    const r = await fetch(`/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
+      method: "POST",
+    });
+    const txt = await r.text();
+    if (!r.ok) throw new Error(txt);
+    alert(txt || "ซิงค์เสร็จแล้ว");
+    // โหลด tasks อีกรอบ เผื่อมีงานใหม่จาก calendar
+    await load();
+  } catch (e: any) {
+    alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
+  } finally {
+    setCfgLoading(false);
+  }
+}
 
   return (
     <div className="min-h-screen bg-white">
@@ -611,7 +748,41 @@ export default function LiffAdminPage() {
             </tbody>
           </table>
         </div>
+{/* ===== Calendar Settings (ต่อกลุ่ม) ===== */}
+<div className="mt-6 p-4 border rounded-lg bg-slate-50">
+  <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div>
+      <label className="text-sm text-slate-600">Calendar #1 ID (เช่น primary หรือ you@domain)</label>
+      <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Id} onChange={e=>setCal1Id(e.target.value)} placeholder="calendarId 1" />
+    </div>
+    <div>
+      <label className="text-sm text-slate-600">Tag เวลา import</label>
+      <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Tag} onChange={e=>setCal1Tag(e.target.value)} placeholder="เช่น CAL1" />
+    </div>
+    <div>
+      <label className="text-sm text-slate-600">Calendar #2 ID</label>
+      <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Id} onChange={e=>setCal2Id(e.target.value)} placeholder="calendarId 2 (ถ้ามี)" />
+    </div>
+    <div>
+      <label className="text-sm text-slate-600">Tag เวลา import</label>
+      <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Tag} onChange={e=>setCal2Tag(e.target.value)} placeholder="เช่น CAL2" />
+    </div>
+  </div>
 
+  <div className="mt-3 flex gap-2">
+    <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
+      บันทึก Calendar IDs
+    </button>
+    <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
+      ซิงค์จาก Google Calendar ตอนนี้
+    </button>
+  </div>
+
+  <div className="mt-2 text-xs text-slate-500">
+    * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
+  </div>
+</div>
         {/* ===== Calendar (Monthly) ===== */}
         <div className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
