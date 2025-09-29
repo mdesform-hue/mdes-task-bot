@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const rows = await sql/* sql */`
     select group_id, cal1_id, cal1_tag, cal1_color,
            cal2_id, cal2_tag, cal2_color,
-           since_month, tz, last_sync_at, created_at, updated_at
+           since_month, tz, last_synced_at, created_at, updated_at
     from public.calendar_configs
     where group_id=${group_id}
     limit 1`;
