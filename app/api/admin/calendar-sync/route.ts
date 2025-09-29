@@ -137,28 +137,27 @@ export async function POST(req: NextRequest) {
   // ดึง event และ upsert เป็น tasks
   let total = 0;
   for (const { id: calId, tag } of calendars) {
-let pageToken: string | undefined;
-do {
-  const resp: calendar_v3.Schema$Events = (await calendar.events.list({
-    calendarId: calId,
-    singleEvents: true,
-    orderBy: "startTime",
-    timeMin,
-    timeMax,
-    pageToken,
-    showDeleted: false,
-    maxResults: 2500,
-  })).data;
+    let pageToken: string | undefined = undefined;
+    do {
+      const resp = await calendar.events.list({
+        calendarId: calId,
+        singleEvents: true,
+        orderBy: "startTime",
+        timeMin,
+        timeMax,
+        pageToken,
+        showDeleted: false,
+        maxResults: 2500,
+      });
 
-  const events = resp.items ?? [];
-  for (const ev of events) {
-    if (color && ev.colorId && ev.colorId !== color) continue;
-    await upsertEvent(group_id, calId, ev);
-    total++;
-  }
+      const events = resp.items ?? [];
+      for (const ev of events) {
+        await upsertTaskFromEvent({ group_id, calendar_id: calId, tag, ev });
+        total++;
+      }
 
-  pageToken = resp.nextPageToken || undefined;
-} while (pageToken);
+      pageToken = resp.data.nextPageToken || undefined;
+    } while (pageToken);
   }
 
   // อัปเดตเวลาซิงค์ล่าสุด
