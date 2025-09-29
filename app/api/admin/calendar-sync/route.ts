@@ -1,4 +1,4 @@
-// app/api/admin/calendar-sync/route.ts
+// app/api/admin/calendar-sync/route.t
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { google, calendar_v3 } from "googleapis";
