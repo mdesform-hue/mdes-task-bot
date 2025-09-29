@@ -5,146 +5,141 @@ import { google } from "googleapis";
 
 export const runtime = "nodejs";
 
-// ---------- helpers ----------
+/** ───────── helpers ───────── */
 function assertKey(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key");
   if (!key || key !== process.env.ADMIN_KEY) {
     throw new Response("unauthorized", { status: 401 });
   }
 }
-function parseJSONEnv(name: string) {
-  const raw = process.env[name];
-  if (!raw) throw new Error(`${name} missing`);
-  try {
-    // รองรับกรณีใส่ใน ENV แล้ว \n ถูก escape
-    return JSON.parse(raw.replace(/\\n/g, "\n"));
-  } catch (e) {
-    // ถ้าเป็น JSON อยู่แล้วก็ลอง parse ตรง ๆ
-    return JSON.parse(raw);
+
+function getServiceAccountAuth() {
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  if (!clientEmail || !privateKey) {
+    throw new Error("GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY missing");
   }
+  // เผื่อคีย์ถูกเก็บด้วย \n
+  privateKey = privateKey.replace(/\\n/g, "\n");
+  return new google.auth.JWT(
+    clientEmail,
+    undefined,
+    privateKey,
+    ["https://www.googleapis.com/auth/calendar.readonly"]
+  );
 }
 
-// map ชื่อสี → colorId ตามพรีเซ็ตของ Google Calendar
-// 1 Lavender, 2 Sage, 3 Grape, 4 Flamingo, 5 Banana, 6 Tangerine,
-// 7 Peacock, 8 Graphite, 9 Blueberry, 10 Basil, 11 Tomato
-const COLOR_NAME_TO_ID: Record<string, string> = {
-  lavender: "1",
-  sage: "2",
-  grape: "3",
-  flamingo: "4",
-  banana: "5",
-  tangerine: "6",
-  peacock: "7",
-  graphite: "8",
-  blueberry: "9",
-  basil: "10",
-  tomato: "11",
-};
-function normColor(value?: string | null) {
-  if (!value) return null;
-  const v = String(value).trim().toLowerCase();
-  return COLOR_NAME_TO_ID[v] ?? value; // ถ้าให้เลขมาแล้วก็ใช้เลข
-}
-
+/** แปลงช่วงเวลา */
 function toISODateRange(start: Date, end: Date) {
-  return {
-    timeMin: start.toISOString(),
-    timeMax: end.toISOString(),
-  };
+  return { timeMin: start.toISOString(), timeMax: end.toISOString() };
 }
 
-function toDateInTZ(dateOnly: string, tz: string, end = false): string {
-  // dateOnly: "YYYY-MM-DD"
-  // สร้าง ISO โดยสมมติ 00:00 / 23:59 ในโซนเวลา tz
-  const base = end ? "T23:59:00" : "T00:00:00";
-  // NOTE: ไม่คำนวณ DST ละเอียดในฝั่ง serverless — ใช้ +07:00 สำหรับ Asia/Bangkok
-  const offset = tz === "Asia/Bangkok" ? "+07:00" : "Z";
-  return new Date(`${dateOnly}${base}${offset}`).toISOString();
-}
+/** upsert เข้า public.tasks โดยใช้กุญแจ (group_id, external_source, external_id) */
+async function upsertTaskFromEvent(params: {
+  group_id: string;
+  calendar_id: string;
+  tag: string;
+  ev: any;
+}) {
+  const { group_id, calendar_id, tag, ev } = params;
 
-// upsert 1 event
-async function upsertEvent(group_id: string, calendar_id: string, ev: any) {
   const startISO =
     ev.start?.dateTime ??
-    (ev.start?.date ? toDateInTZ(ev.start.date, "Asia/Bangkok", false) : null);
+    (ev.start?.date ? `${ev.start.date}T00:00:00+07:00` : null);
   const endISO =
     ev.end?.dateTime ??
-    (ev.end?.date ? toDateInTZ(ev.end.date, "Asia/Bangkok", true) : null);
+    (ev.end?.date ? `${ev.end.date}T23:59:00+07:00` : null);
 
+  // ใช้ start เป็น due_at (พอสำหรับแสดงในปฏิทินงาน)
+  const dueAt = startISO ?? endISO ?? null;
+
+  // สร้าง code แบบคงที่จาก event.id (4 ตัวอักษรแรกของ md5)
+  // หมายเหตุ: ใน on conflict เราจะไม่แตะ code เดิม
   await sql/* sql */`
-    insert into public.external_calendar_events(
-      group_id, calendar_id, google_event_id, etag, status,
-      summary, description, location, color_id,
-      start_at, end_at, html_link, raw, updated_at
-    ) values (
-      ${group_id}, ${calendar_id}, ${ev.id}, ${ev.etag ?? null}, ${ev.status ?? null},
-      ${ev.summary ?? null}, ${ev.description ?? null}, ${ev.location ?? null}, ${ev.colorId ?? null},
-      ${startISO ?? null}, ${endISO ?? null}, ${ev.htmlLink ?? null}, ${ev ?? null}, now()
+    insert into public.tasks (
+      group_id, title, description, due_at,
+      progress, status, code, priority, tags,
+      external_source, external_id, external_ref,
+      created_at, updated_at
     )
-    on conflict (group_id, calendar_id, google_event_id) do update set
-      etag = excluded.etag,
-      status = excluded.status,
-      summary = excluded.summary,
+    values (
+      ${group_id},
+      ${ev.summary ?? "(no title)"},
+      ${ev.description ?? null},
+      ${dueAt},
+      0, 'todo',
+      substring(md5(${ev.id}) from 1 for 4),
+      'medium',
+      array[${tag}]::text[],
+      'google_calendar', ${ev.id}, ${calendar_id},
+      now(), now()
+    )
+    on conflict (group_id, external_source, external_id) do update set
+      title       = excluded.title,
       description = excluded.description,
-      location = excluded.location,
-      color_id = excluded.color_id,
-      start_at = excluded.start_at,
-      end_at = excluded.end_at,
-      html_link = excluded.html_link,
-      raw = excluded.raw,
-      updated_at = now()
+      due_at      = excluded.due_at,
+      -- รวม tag เดิมกับ tag ใหม่ และลดซ้ำ
+      tags = (
+        select array_agg(distinct x)
+        from unnest(coalesce(public.tasks.tags, '{}')::text[] || excluded.tags) as t(x)
+      ),
+      updated_at  = now()
   `;
 }
 
+/** ───────── handler ───────── */
 export async function POST(req: NextRequest) {
-  try {
-    assertKey(req);
-  } catch (res: any) { return res; }
+  try { assertKey(req); } catch (res: any) { return res; }
 
   const group_id = req.nextUrl.searchParams.get("group_id");
   if (!group_id) return new Response("group_id required", { status: 400 });
 
-  // โหลด settings
+  // โหลด settings จาก public.calendar_configs
   const setRows = await sql/* sql */`
-    select *
-    from public.group_calendar_settings
-    where group_id=${group_id}
-    limit 1`;
+    select group_id, cal1_id, cal1_tag, cal2_id, cal2_tag, fetch_from, last_synced_at
+    from public.calendar_configs
+    where group_id = ${group_id}
+    limit 1
+  `;
   if (!setRows.length) {
     return new Response("settings not found for this group", { status: 404 });
   }
-  const settings = setRows[0];
+  const settings = setRows[0] as {
+    group_id: string;
+    cal1_id: string | null;
+    cal1_tag: string | null;
+    cal2_id: string | null;
+    cal2_tag: string | null;
+    fetch_from: string | null;        // date
+    last_synced_at: string | null;
+  };
 
-  // auth service account
-  const creds = parseJSONEnv("GOOGLE_PRIVATE_KEY");
-  const scopes = ["https://www.googleapis.com/auth/calendar.readonly"];
-  const auth = new google.auth.GoogleAuth({ credentials: creds, scopes });
+  // auth (Service Account)
+  const auth = getServiceAccountAuth();
   const calendar = google.calendar({ version: "v3", auth });
 
-  // กำหนดช่วงเวลา
-  const tz = settings.tz || "Asia/Bangkok";
-  const since = settings.since_month
-    ? new Date(settings.since_month) // สมมติเป็น first day of month ใน DB
-    : new Date("2025-09-01T00:00:00+07:00"); // กันยายน 2568 ตามโจทย์
-  const until = new Date();
-  // ดึงล่วงหน้าอีกเล็กน้อย (เช่น +6 เดือน)
-  const plus6 = new Date(until.getFullYear(), until.getMonth() + 6, 1);
+  // กำหนดช่วงเวลา: ตั้งแต่ fetch_from (ถ้ามี) ไม่งั้นเริ่ม 2025-09-01 → ถึงอีก 6 เดือนข้างหน้า
+  const start = settings.fetch_from
+    ? new Date(settings.fetch_from + "T00:00:00+07:00")
+    : new Date("2025-09-01T00:00:00+07:00");
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+  const { timeMin, timeMax } = toISODateRange(start, end);
 
-  const { timeMin, timeMax } = toISODateRange(since, plus6);
+  // เตรียมรายการปฏิทินที่ต้องดึง พร้อม tag
+  const calendars: Array<{ id: string; tag: string }> = [];
+  if (settings.cal1_id) calendars.push({ id: settings.cal1_id, tag: settings.cal1_tag || "CAL1" });
+  if (settings.cal2_id) calendars.push({ id: settings.cal2_id, tag: settings.cal2_tag || "CAL2" });
+  if (!calendars.length) {
+    return new Response("no calendars configured for this group", { status: 400 });
+  }
 
-  // สีที่อยากกรอง
-  const cal1Color = normColor(settings.cal1_color);
-  const cal2Color = normColor(settings.cal2_color);
-
-  const calendars: Array<{ id: string; color?: string | null }> = [];
-  if (settings.cal1_id) calendars.push({ id: settings.cal1_id, color: cal1Color });
-  if (settings.cal2_id) calendars.push({ id: settings.cal2_id, color: cal2Color });
-
+  // ดึง event และ upsert เป็น tasks
   let total = 0;
-  for (const { id: calId, color } of calendars) {
+  for (const { id: calId, tag } of calendars) {
     let pageToken: string | undefined = undefined;
     do {
-      const resp: any = await calendar.events.list({
+      const resp = await calendar.events.list({
         calendarId: calId,
         singleEvents: true,
         orderBy: "startTime",
@@ -157,9 +152,7 @@ export async function POST(req: NextRequest) {
 
       const events = resp.data.items ?? [];
       for (const ev of events) {
-        // กรองตามสี (ถ้ากำหนด)
-        if (color && ev.colorId && ev.colorId !== color) continue;
-        await upsertEvent(group_id, calId, ev);
+        await upsertTaskFromEvent({ group_id, calendar_id: calId, tag, ev });
         total++;
       }
 
@@ -167,11 +160,12 @@ export async function POST(req: NextRequest) {
     } while (pageToken);
   }
 
-  // อัปเดต last_sync_at
+  // อัปเดตเวลาซิงค์ล่าสุด
   await sql/* sql */`
-    update public.group_calendar_settings
-    set last_sync_at = now(), updated_at = now()
-    where group_id=${group_id}`;
+    update public.calendar_configs
+    set last_synced_at = now(), updated_at = now()
+    where group_id = ${group_id}
+  `;
 
-  return Response.json({ ok: true, group_id, total, timeMin, timeMax, tz });
+  return Response.json({ ok: true, group_id, total, timeMin, timeMax });
 }
