@@ -1,7 +1,6 @@
 // app/api/admin/calendar-sync/route.ts
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
-import { google } from "googleapis";
 import { google, calendar_v3 } from "googleapis";
 
 export const runtime = "nodejs";
@@ -138,27 +137,28 @@ export async function POST(req: NextRequest) {
   // ดึง event และ upsert เป็น tasks
   let total = 0;
   for (const { id: calId, tag } of calendars) {
-    let pageToken: string | undefined = undefined;
-    do {
-      const resp = await calendar.events.list({
-        calendarId: calId,
-        singleEvents: true,
-        orderBy: "startTime",
-        timeMin,
-        timeMax,
-        pageToken,
-        showDeleted: false,
-        maxResults: 2500,
-      });
+let pageToken: string | undefined;
+do {
+  const resp: calendar_v3.Schema$Events = (await calendar.events.list({
+    calendarId: calId,
+    singleEvents: true,
+    orderBy: "startTime",
+    timeMin,
+    timeMax,
+    pageToken,
+    showDeleted: false,
+    maxResults: 2500,
+  })).data;
 
-      const events = resp.items ?? [];
-      for (const ev of events) {
-        await upsertTaskFromEvent({ group_id, calendar_id: calId, tag, ev });
-        total++;
-      }
+  const events = resp.items ?? [];
+  for (const ev of events) {
+    if (color && ev.colorId && ev.colorId !== color) continue;
+    await upsertEvent(group_id, calId, ev);
+    total++;
+  }
 
-      pageToken = resp.data.nextPageToken || undefined;
-    } while (pageToken);
+  pageToken = resp.nextPageToken || undefined;
+} while (pageToken);
   }
 
   // อัปเดตเวลาซิงค์ล่าสุด
