@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
     const rows = await sql/* sql */`
       select group_id, cal1_id, cal1_tag, cal2_id, cal2_tag, last_synced_at
-      from public.group_calendar_configs
+      from public.calendar_configs
       where group_id=${group_id}
       limit 1`;
 
@@ -47,7 +47,7 @@ export async function PUT(req: Request) {
       on conflict (id) do nothing`;
 
     const rows = await sql/* sql */`
-      insert into public.group_calendar_configs (group_id, cal1_id, cal1_tag, cal2_id, cal2_tag)
+      insert into public.calendar_configs (group_id, cal1_id, cal1_tag, cal2_id, cal2_tag)
       values (${group_id}, ${cal1_id}, ${cal1_tag}, ${cal2_id}, ${cal2_tag})
       on conflict (group_id) do update
       set cal1_id=${cal1_id}, cal1_tag=${cal1_tag}, cal2_id=${cal2_id}, cal2_tag=${cal2_tag}
