@@ -1,6 +1,7 @@
-import { NextRequest } from "next/server";
+// app/api/admin/calendar-import/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { google } from "googleapis";
+import { google, calendar_v3 } from "googleapis";
 
 export const runtime = "nodejs";
 
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 function assertKey(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key");
   if (!key || key !== process.env.ADMIN_KEY) {
-    throw new Response("unauthorized", { status: 401 });
+    throw new NextResponse("unauthorized", { status: 401 });
   }
 }
 
@@ -29,7 +30,6 @@ function getJwtAuth() {
 
 // สร้าง code ที่ deterministic จาก eventId (กันซ้ำในกลุ่ม)
 function codeFromEventId(evId: string) {
-  // ตัดให้สั้นหน่อยแต่ยังคง unique โดยทั่วไป
   return "GCAL-" + evId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
 }
 
@@ -41,6 +41,7 @@ function dateOnlyToISO(dateOnly: string, end = false) {
 }
 
 export async function POST(req: NextRequest) {
+  // 0) guard
   try {
     assertKey(req);
   } catch (res: any) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   const group_id = req.nextUrl.searchParams.get("group_id");
-  if (!group_id) return new Response("group_id required", { status: 400 });
+  if (!group_id) return new NextResponse("group_id required", { status: 400 });
 
   try {
     // 1) อ่าน config จากตารางที่มีจริง: calendar_configs
@@ -58,26 +59,26 @@ export async function POST(req: NextRequest) {
       where group_id = ${group_id}
       limit 1`;
     if (!cfgRows.length) {
-      return new Response("settings not found for this group", { status: 404 });
+      return new NextResponse("settings not found for this group", { status: 404 });
     }
     const cfg = cfgRows[0] as {
       cal1_id: string | null;
       cal1_tag: string | null;
       cal2_id: string | null;
       cal2_tag: string | null;
-      fetch_from: string | null; // date
+      fetch_from: string | null; // date (YYYY-MM-DD)
     };
 
     const calendars: Array<{ id: string; tag: string }> = [];
     if (cfg.cal1_id) calendars.push({ id: cfg.cal1_id, tag: cfg.cal1_tag ?? "CAL1" });
     if (cfg.cal2_id) calendars.push({ id: cfg.cal2_id, tag: cfg.cal2_tag ?? "CAL2" });
     if (calendars.length === 0) {
-      return new Response("no calendar configured", { status: 400 });
+      return new NextResponse("no calendar configured", { status: 400 });
     }
 
-    // 2) เตรียมช่วงเวลา: ตั้งแต่ fetch_from (หรือ 2025-09-01) → อีก 6 เดือนข้างหน้า
+    // 2) กำหนดช่วงเวลา: ตั้งแต่ fetch_from (หรือ 2025-09-01) → อีก 6 เดือนข้างหน้า
     const since = cfg.fetch_from
-      ? new Date(cfg.fetch_from + "T00:00:00+07:00")
+      ? new Date(`${cfg.fetch_from}T00:00:00+07:00`)
       : new Date("2025-09-01T00:00:00+07:00");
     const now = new Date();
     const until = new Date(now.getFullYear(), now.getMonth() + 6, 1);
@@ -92,9 +93,9 @@ export async function POST(req: NextRequest) {
 
     // 4) ดึง event แล้ว import → tasks โดยตรง
     for (const { id: calId, tag } of calendars) {
-      let pageToken: string | undefined = undefined;
+      let pageToken: string | undefined;
       do {
-        const resp = await calendar.events.list({
+        const { data } = await calendar.events.list({
           calendarId: calId,
           singleEvents: true,
           orderBy: "startTime",
@@ -104,11 +105,16 @@ export async function POST(req: NextRequest) {
           showDeleted: false,
           maxResults: 2500,
         });
-        const items = resp.data.items ?? [];
+
+        const items = (data.items ?? []) as calendar_v3.Schema$Event[];
 
         for (const ev of items) {
-          const evId = ev.id!;
-          const title = ev.summary || "(ไม่มีชื่ออีเวนต์)";
+          // ข้าม event ที่ถูกยกเลิก หรือไม่มี id
+          if (ev.status === "cancelled" || !ev.id) continue;
+
+          const evId = ev.id;
+          const title = ev.summary?.trim() || "(ไม่มีชื่ออีเวนต์)";
+
           const startISO =
             ev.start?.dateTime ??
             (ev.start?.date ? dateOnlyToISO(ev.start.date, false) : null);
@@ -116,22 +122,33 @@ export async function POST(req: NextRequest) {
             ev.end?.dateTime ??
             (ev.end?.date ? dateOnlyToISO(ev.end.date, true) : null);
 
-          // แปลงเป็น task: code จาก eventId, ติด tag ของปฏิทิน, progress 0 (หรือ 100 ถ้าอยากทำเป็น done)
+          // ถ้าไม่มีเวลาเริ่ม ให้ข้าม (กันบันทึก task ที่กำหนด due ไม่ได้)
+          if (!startISO) continue;
+
+          // อธิบาย/ลิงก์
+          const description =
+            ev.htmlLink ? `${ev.htmlLink}\n\n${ev.description ?? ""}` : (ev.description ?? null);
+
+          // code เดียวต่อ event ต่อกลุ่ม
           const code = codeFromEventId(evId);
 
-          // upsert ที่ตาราง tasks โดยยึด (group_id, code) ซึ่งคุณมี unique index แล้ว
+          // เตรียม tags (array) จากปฏิทิน
+          const tags: string[] = tag ? [tag] : [];
+
+          // upsert: (group_id, code) unique
           await sql/*sql*/`
-            insert into public.tasks (group_id, code, title, description, due_at, progress, status, priority, tags)
-            values (
+            insert into public.tasks (
+              group_id, code, title, description, due_at, progress, status, priority, tags
+            ) values (
               ${group_id},
               ${code},
               ${title},
-              ${ev.htmlLink ? `${ev.htmlLink}\n\n${ev.description ?? ""}` : ev.description ?? null},
-              ${startISO ?? null},
-              0,
-              'todo',
-              'medium',
-              ${tag ? [tag] : []}
+              ${description},
+              ${startISO},
+              ${0},
+              ${'todo'},
+              ${'medium'},
+              ${tags}
             )
             on conflict (group_id, code) do update set
               title = excluded.title,
@@ -139,10 +156,11 @@ export async function POST(req: NextRequest) {
               due_at = excluded.due_at,
               updated_at = now()
           `;
+
           imported++;
         }
 
-        pageToken = resp.data.nextPageToken || undefined;
+        pageToken = data.nextPageToken || undefined;
       } while (pageToken);
     }
 
@@ -153,9 +171,8 @@ export async function POST(req: NextRequest) {
       where group_id = ${group_id}
     `;
 
-    return Response.json({ ok: true, group_id, imported, timeMin, timeMax });
+    return NextResponse.json({ ok: true, group_id, imported, timeMin, timeMax });
   } catch (e: any) {
-    // ส่งรายละเอียด error ออกมาเพื่อดีบักง่ายขึ้น
-    return new Response(`Error: ${e?.message || e}`, { status: 500 });
+    return new NextResponse(`Error: ${e?.message || e}`, { status: 500 });
   }
 }
