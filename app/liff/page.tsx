@@ -43,11 +43,6 @@ type Toast = { type: "ok" | "err"; text: string } | null;
 
 export default function LiffAdminPage() {
   // state สำหรับ calendar config
-  const [cal1Id, setCal1Id] = useState("");
-  const [cal1Tag, setCal1Tag] = useState("CAL1");
-  const [cal2Id, setCal2Id] = useState("");
-  const [cal2Tag, setCal2Tag] = useState("CAL2");
-  const [cfgLoading, setCfgLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
@@ -159,26 +154,6 @@ export default function LiffAdminPage() {
     const d = draft[item.id] || {};
     return { ...item, ...d, ...patch };
   }
-// โหลด config เมื่อพร้อมและมี groupId/adminKey
-useEffect(() => {
-  (async () => {
-    if (!ready || !groupId || !adminKey) return;
-    try {
-      setCfgLoading(true);
-      const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`);
-      if (!r.ok) throw new Error(await r.text());
-      const j = await r.json();
-      setCal1Id(j.cal1_id ?? "");
-      setCal1Tag(j.cal1_tag ?? "CAL1");
-      setCal2Id(j.cal2_id ?? "");
-      setCal2Tag(j.cal2_tag ?? "CAL2");
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCfgLoading(false);
-    }
-  })();
-}, [ready, groupId, adminKey]);
 
 async function saveCalendarConfig() {
   if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
@@ -398,47 +373,7 @@ useEffect(() => {
   })();
 }, [ready, groupId, adminKey]);
 
-async function saveCalendarConfig() {
-  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
-  try {
-    setCfgLoading(true);
-    const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cal1_id: cal1Id || null,
-        cal1_tag: cal1Tag || "CAL1",
-        cal2_id: cal2Id || null,
-        cal2_tag: cal2Tag || "CAL2",
-      }),
-    });
-    if (!r.ok) throw new Error(await r.text());
-    alert("บันทึก Calendar IDs เรียบร้อย");
-  } catch (e: any) {
-    alert(`บันทึกไม่สำเร็จ: ${e.message || e}`);
-  } finally {
-    setCfgLoading(false);
-  }
-}
 
-async function syncNow() {
-  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
-  try {
-    setCfgLoading(true);
-    const r = await fetch(`/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
-      method: "POST",
-    });
-    const txt = await r.text();
-    if (!r.ok) throw new Error(txt);
-    alert(txt || "ซิงค์เสร็จแล้ว");
-    // โหลด tasks อีกรอบ เผื่อมีงานใหม่จาก calendar
-    await load();
-  } catch (e: any) {
-    alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
-  } finally {
-    setCfgLoading(false);
-  }
-}
 
   return (
     <div className="min-h-screen bg-white">
@@ -535,8 +470,8 @@ async function syncNow() {
                  value={Array.isArray(creating.tags)? creating.tags.join(", ") : (creating.tags as any || "")}
                  onChange={e=>setCreating(c=>({...c, tags: parseTags(e.target.value)}))}/>
           <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" type="date"
-                 value={creating.due_at ? fmtDate(creating.due_at) : ""}
-                 onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}/>
+                 value={creating.due_at ?? ""}
+                  onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}
           <button className="md:col-span-12 bg-green-600 text-white px-4 py-3 md:py-2 rounded" onClick={createRow}>+ Add</button>
         </div>
 
