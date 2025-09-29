@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
   const settings = setRows[0];
 
   // auth service account
-  const creds = parseJSONEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
+  const creds = parseJSONEnv("GOOGLE_PRIVATE_KEY");
   const scopes = ["https://www.googleapis.com/auth/calendar.readonly"];
   const auth = new google.auth.GoogleAuth({ credentials: creds, scopes });
   const calendar = google.calendar({ version: "v3", auth });
