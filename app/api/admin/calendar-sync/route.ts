@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
   for (const { id: calId, color } of calendars) {
     let pageToken: string | undefined = undefined;
     do {
-      const resp = await calendar.events.list({
+      const resp: any = await calendar.events.list({
         calendarId: calId,
         singleEvents: true,
         orderBy: "startTime",
