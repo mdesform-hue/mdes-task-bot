@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { google } from "googleapis";
+import { google, calendar_v3 } from "googleapis";
 
 export const runtime = "nodejs";
 
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
         maxResults: 2500,
       });
 
-      const events = resp.data.items ?? [];
+      const events = resp.items ?? [];
       for (const ev of events) {
         await upsertTaskFromEvent({ group_id, calendar_id: calId, tag, ev });
         total++;
