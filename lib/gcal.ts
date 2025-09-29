@@ -1,6 +1,5 @@
 // lib/gcal.ts
 import { google, calendar_v3 } from "googleapis";
-import type { GaxiosError } from "gaxios";
 
 // ==== ENV ====
 const GOOGLE_CLIENT_EMAIL = (process.env.GOOGLE_CLIENT_EMAIL || "").trim();
@@ -11,7 +10,7 @@ const TIMEZONE            = "Asia/Bangkok";
 // แปลง \n ใน private key (กรณีเก็บใน ENV แบบ single-line)
 const GOOGLE_PRIVATE_KEY = RAW_PRIVATE_KEY.replace(/\\n/g, "\n");
 
-// ตรวจ ENV ให้ครบ (เตือนตอนโหลดโมดูล)
+// เตือนตอนโหลดถ้า ENV ไม่ครบ (ไม่หยุด build)
 if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY || !CALENDAR_ID) {
   console.warn(
     "⚠️ Missing Google Calendar envs. Required: GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, GCAL_CALENDAR_ID"
@@ -19,7 +18,6 @@ if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY || !CALENDAR_ID) {
 }
 
 // ==== Auth / Client ====
-// หมายเหตุ: โมดูลนี้โหลดครั้งเดียวใน runtime เดียว => auth reuse ได้
 const auth = new google.auth.JWT({
   email: GOOGLE_CLIENT_EMAIL || undefined,
   key: GOOGLE_PRIVATE_KEY || undefined,
@@ -33,16 +31,15 @@ export type GcalEventInput = {
   title: string;
   startISO: string; // e.g. 2025-01-31T10:00:00+07:00
   endISO: string;   // e.g. 2025-01-31T11:00:00+07:00
-  attendees?: string[];      // รายชื่ออีเมลผู้เข้าร่วม (optional)
+  attendees?: string[];
   description?: string | null;
   location?: string | null;
-  colorId?: string | number | null; // เพิ่ม: รองรับกำหนดสี (Google preset 1..11)
+  colorId?: string | number | null; // Google preset 1..11
 };
 
 export type CreatedEvent = calendar_v3.Schema$Event;
 
 // ==== Helpers ====
-// ตรวจ ENV ก่อนยิง API (โยน error ชัดเจน)
 function ensureEnv() {
   if (!GOOGLE_CLIENT_EMAIL) throw new Error("GOOGLE_CLIENT_EMAIL is missing");
   if (!GOOGLE_PRIVATE_KEY)  throw new Error("GOOGLE_PRIVATE_KEY is missing");
@@ -61,26 +58,19 @@ function assertTimeRange(startISO: string, endISO: string) {
   if (Number.isNaN(s) || Number.isNaN(e)) {
     throw new Error("Invalid datetime: startISO/endISO must be valid ISO strings");
   }
-  if (e <= s) {
-    throw new Error("Invalid time range: endISO must be greater than startISO");
-  }
+  if (e <= s) throw new Error("Invalid time range: endISO must be greater than startISO");
 }
 
 // ==== API ====
-// สร้าง Event ลงปฏิทินหลัก (ที่กำหนดใน GCAL_CALENDAR_ID)
 export async function createCalendarEvent(input: GcalEventInput): Promise<CreatedEvent> {
   ensureEnv();
 
   const { title, startISO, endISO, attendees, description, location, colorId } = input;
 
-  // validate พื้นฐาน
   if (!title?.trim()) throw new Error("title is required");
-  if (!startISO?.trim() || !endISO?.trim()) {
-    throw new Error("startISO and endISO are required");
-  }
+  if (!startISO?.trim() || !endISO?.trim()) throw new Error("startISO and endISO are required");
   assertTimeRange(startISO, endISO);
 
-  // สร้าง request
   const request: calendar_v3.Params$Resource$Events$Insert = {
     calendarId: CALENDAR_ID,
     requestBody: {
@@ -94,21 +84,21 @@ export async function createCalendarEvent(input: GcalEventInput): Promise<Create
         : undefined,
       colorId: colorId != null ? String(colorId) : undefined,
     },
-    // ส่งเชิญไปยังผู้ร่วมถ้ามี
     sendUpdates: (attendees && attendees.length) ? "all" : "none",
   };
 
   try {
     const res = await calendar.events.insert(request);
     return res.data;
-  } catch (err) {
-    // แปลง error จาก Google ให้เข้าใจง่ายขึ้นเวลา log/แจ้งผู้ใช้
-    const gerr = err as GaxiosError<{ error?: { message?: string; errors?: unknown; code?: number } }>;
-    const status = gerr.response?.status;
-    const body = gerr.response?.data?.error;
+  } catch (err: unknown) {
+    // จัดรูป error แบบ generic (ไม่ต้องพึ่ง type จาก gaxios)
+    const anyErr = err as any;
+    const status = anyErr?.response?.status;
+    const body   = anyErr?.response?.data?.error;
+
     const message =
       body?.message ||
-      gerr.message ||
+      anyErr?.message ||
       "Google Calendar API error while creating event";
 
     const details = {
@@ -117,9 +107,7 @@ export async function createCalendarEvent(input: GcalEventInput): Promise<Create
       errors: body?.errors,
     };
 
-    // โยน error ที่มีรายละเอียด (อย่าลืมจับด้านนอกถ้าใช้ใน route)
     const enriched = new Error(`${message} (${JSON.stringify(details)})`);
-    // เก็บ stack เดิมไว้ถ้าจำเป็น
     (enriched as any).cause = err;
     throw enriched;
   }
