@@ -38,6 +38,9 @@ const parseTags = (s: string) => s.split(",").map(x=>x.trim()).filter(Boolean);
 const fmtDate = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)) : "";
 
+// Toast แบบง่าย
+type Toast = { type: "ok" | "err"; text: string } | null;
+
 export default function LiffAdminPage() {
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
@@ -69,6 +72,22 @@ export default function LiffAdminPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  // saving state ต่อแถว
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const markSaving = (id: string, on: boolean) =>
+    setSavingIds(prev => {
+      const s = new Set(prev);
+      on ? s.add(id) : s.delete(id);
+      return s;
+    });
+
+  // toast
+  const [toast, setToast] = useState<Toast>(null);
+  const showToast = (t: Toast) => {
+    setToast(t);
+    if (t) setTimeout(() => setToast(null), 1800);
+  };
 
   // ========= init: URL -> localStorage -> LIFF context =========
   useEffect(() => {
@@ -115,7 +134,7 @@ export default function LiffAdminPage() {
     if (!groupId || !adminKey) return;
     const r = await fetch(`/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&q=${encodeURIComponent(q)}&key=${encodeURIComponent(adminKey)}`);
     if (!r.ok) {
-      alert(await r.text());
+      showToast({ type: "err", text: await r.text() });
       setItems([]);
       clearSel();
       return;
@@ -141,18 +160,26 @@ export default function LiffAdminPage() {
 
     // optimistic UI
     setItems(prev => prev.map(x => x.id === id ? ({ ...x, ...body }) as Task : x));
+    markSaving(id, true);
 
-    const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-    });
+    try {
+      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+      });
 
-    if (r.ok) {
-      setDraft(d => { const { [id]:_, ...rest } = d; return rest; });
-      // ดึงค่าจริงกลับ (เผื่อ server แก้อะไรเพิ่ม)
-      await load();
-      alert("บันทึกแล้ว");
-    } else {
-      alert(await r.text());
+      if (r.ok) {
+        setDraft(d => { const { [id]:_, ...rest } = d; return rest; });
+        // ดึงค่าจริงกลับ (เผื่อ server แก้อะไรเพิ่ม)
+        await load();
+        showToast({ type: "ok", text: "บันทึกแล้ว" });
+      } else {
+        const msg = await r.text();
+        showToast({ type: "err", text: msg || "บันทึกไม่สำเร็จ" });
+      }
+    } catch (e) {
+      showToast({ type: "err", text: "เครือข่ายผิดพลาด" });
+    } finally {
+      markSaving(id, false);
     }
   };
 
@@ -160,25 +187,36 @@ export default function LiffAdminPage() {
     if (!confirm("ลบงานนี้?")) return;
     // optimistic remove
     setItems(prev => prev.filter(x => x.id !== id));
-    const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" });
-    if (!r.ok) {
-      alert(await r.text());
+    try {
+      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" });
+      if (!r.ok) {
+        showToast({ type: "err", text: await r.text() });
+        load();
+      } else {
+        showToast({ type: "ok", text: "ลบแล้ว" });
+      }
+    } catch {
+      showToast({ type: "err", text: "เครือข่ายผิดพลาด" });
       load();
     }
   };
 
   const createRow = async () => {
-    if (!creating.title) return alert("กรอกชื่อเรื่องก่อน");
+    if (!creating.title) return showToast({ type: "err", text: "กรอกชื่องานก่อน" });
     const body = { group_id: groupId, ...creating };
-    const r = await fetch(`/api/admin/tasks?key=${encodeURIComponent(adminKey)}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-    });
-    if (r.ok) {
-      setCreating({ title: "", due_at: null, description: "", priority: "medium", tags: [] });
-      await load();
-      alert("สร้างงานแล้ว");
-    } else {
-      alert(await r.text());
+    try {
+      const r = await fetch(`/api/admin/tasks?key=${encodeURIComponent(adminKey)}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+      });
+      if (r.ok) {
+        setCreating({ title: "", due_at: null, description: "", priority: "medium", tags: [] });
+        await load();
+        showToast({ type: "ok", text: "สร้างงานแล้ว" });
+      } else {
+        showToast({ type: "err", text: await r.text() });
+      }
+    } catch {
+      showToast({ type: "err", text: "เครือข่ายผิดพลาด" });
     }
   };
 
@@ -195,6 +233,7 @@ export default function LiffAdminPage() {
       })
     ));
     await load();
+    showToast({ type: "ok", text: "อัปเดตสถานะแล้ว" });
   };
   const bulkApplyDue = async () => {
     if (!selected.size || !bulkDue) return;
@@ -206,6 +245,7 @@ export default function LiffAdminPage() {
       })
     ));
     await load();
+    showToast({ type: "ok", text: "อัปเดตกำหนดส่งแล้ว" });
   };
   const bulkDelete = async () => {
     if (!selected.size) return;
@@ -217,6 +257,7 @@ export default function LiffAdminPage() {
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" })
     ));
     await load();
+    showToast({ type: "ok", text: "ลบงานที่เลือกแล้ว" });
   };
 
   const saveGid = () => { writeAll(GID_KEYS, groupId); setEditGid(false); load(); };
@@ -226,7 +267,7 @@ export default function LiffAdminPage() {
     u.searchParams.set("key", adminKey || "");
     if (groupId) u.searchParams.set("group_id", groupId);
     navigator.clipboard.writeText(u.toString());
-    alert("คัดลอกลิงก์แล้ว");
+    showToast({ type: "ok", text: "คัดลอกลิงก์แล้ว" });
   };
 
   // ===== calendar helpers =====
@@ -264,6 +305,14 @@ export default function LiffAdminPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-3 right-3 z-[60] px-3 py-2 rounded shadow text-sm
+          ${toast.type === "ok" ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"}`}>
+          {toast.text}
+        </div>
+      )}
+
       {/* Global header */}
       <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
         <div className="w-full px-4 md:px-8 h-14 flex items-center gap-4">
@@ -334,31 +383,6 @@ export default function LiffAdminPage() {
           </div>
         </div>
 
-        {/* ===== Bulk actions ===== */}
-        {selected.size > 0 && (
-          <div className="mb-4 p-3 border rounded-lg bg-yellow-50 flex flex-wrap items-center gap-3">
-            <div className="text-sm">เลือกแล้ว: <b>{selected.size}</b> งาน</div>
-            <button className="px-3 py-2 rounded border" onClick={selectAllVisible}>เลือกทั้งหมด</button>
-            <button className="px-3 py-2 rounded border" onClick={clearSel}>ล้าง</button>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm">สถานะ:</span>
-              <select className="border rounded px-2 py-2" value={bulkStatus} onChange={e=>setBulkStatus(e.target.value as Task["status"])}>
-                {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={bulkApplyStatus}>Apply</button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm">กำหนด:</span>
-              <input type="date" className="border rounded px-2 py-2" value={bulkDue} onChange={e=>setBulkDue(e.target.value)} />
-              <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={bulkApplyDue}>Apply</button>
-            </div>
-
-            <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={bulkDelete}>ลบที่เลือก</button>
-          </div>
-        )}
-
         {/* ===== Create row ===== */}
         <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
           <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
@@ -384,6 +408,7 @@ export default function LiffAdminPage() {
           {items.map(t => {
             const d = draft[t.id] || {};
             const cur = { ...t, ...d };
+            const isSaving = savingIds.has(t.id);
 
             return (
               <div key={t.id} className="rounded-2xl border shadow-sm p-3">
@@ -394,20 +419,26 @@ export default function LiffAdminPage() {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      className="px-3 py-2 rounded bg-blue-600 text-white"
-                      onClick={() => saveRow(t.id)}
+                      className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
+                      disabled={isSaving}
+                      onClick={() => {
+                        // optimistic
+                        setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x) : x));
+                        saveRow(t.id);
+                      }}
                     >
-                      Save
+                      {isSaving ? "Saving…" : "Save"}
                     </button>
                     <button
-                      className="px-3 py-2 rounded bg-green-700 text-white"
+                      className="px-3 py-2 rounded bg-green-700 text-white disabled:opacity-60"
+                      disabled={isSaving}
                       onClick={() => {
                         change(t.id, { status: "done", progress: 100 });
                         setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x, { status: "done", progress: 100 }) : x));
                         saveRow(t.id, { status: "done", progress: 100 });
                       }}
                     >
-                      Done
+                      {isSaving ? "Saving…" : "Done"}
                     </button>
                     <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={()=>delRow(t.id)}>Del</button>
                   </div>
@@ -489,6 +520,7 @@ export default function LiffAdminPage() {
               {items.map(t => {
                 const d = draft[t.id] || {};
                 const cur = { ...t, ...d };
+                const isSaving = savingIds.has(t.id);
 
                 return (
                   <tr key={t.id} className="border-t">
@@ -545,25 +577,27 @@ export default function LiffAdminPage() {
 
                     <td className="p-2 text-center">
                       <button
-                        className="px-3 py-2 bg-blue-600 text-white rounded mr-2"
+                        className="px-3 py-2 bg-blue-600 text-white rounded mr-2 disabled:opacity-60"
+                        disabled={isSaving}
                         onClick={() => {
                           // optimistic
                           setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x) : x));
                           saveRow(t.id);
                         }}
                       >
-                        Save
+                        {isSaving ? "Saving…" : "Save"}
                       </button>
 
                       <button
-                        className="px-3 py-2 bg-green-700 text-white rounded mr-2"
+                        className="px-3 py-2 bg-green-700 text-white rounded mr-2 disabled:opacity-60"
+                        disabled={isSaving}
                         onClick={() => {
                           change(t.id, { status: "done", progress: 100 });
                           setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x, { status: "done", progress: 100 }) : x));
                           saveRow(t.id, { status: "done", progress: 100 });
                         }}
                       >
-                        Done
+                        {isSaving ? "Saving…" : "Done"}
                       </button>
 
                       <button className="px-3 py-2 bg-red-600 text-white rounded" onClick={()=>delRow(t.id)}>Del</button>
