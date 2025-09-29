@@ -34,7 +34,7 @@ const writeAll = (keys: string[], value: string) => { try { keys.forEach(k => lo
 
 // helpers
 const tagsToStr = (tags: string[] | null | undefined) => (tags ?? []).join(", ");
-const parseTags = (s: string) => s.split(",").map(x=>x.trim()).filter(Boolean);
+const parseTags = (s: string) => (s ?? "").split(",").map(x=>x.trim()).filter(Boolean);
 const fmtDate = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)) : "";
 
@@ -42,7 +42,13 @@ const fmtDate = (iso: string | null) =>
 type Toast = { type: "ok" | "err"; text: string } | null;
 
 export default function LiffAdminPage() {
-  // state สำหรับ calendar config
+  // state สำหรับ calendar config (—> ย้ายไว้ที่เดียว ไม่ซ้ำซ้อน)
+  const [cal1Id, setCal1Id] = useState("");
+  const [cal1Tag, setCal1Tag] = useState("CAL1");
+  const [cal2Id, setCal2Id] = useState("");
+  const [cal2Tag, setCal2Tag] = useState("CAL2");
+  const [cfgLoading, setCfgLoading] = useState(false);
+
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
@@ -136,8 +142,7 @@ export default function LiffAdminPage() {
     const r = await fetch(`/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&q=${encodeURIComponent(q)}&key=${encodeURIComponent(adminKey)}`);
     if (!r.ok) {
       showToast({ type: "err", text: await r.text() });
-      setItems([]);
-      clearSel();
+      setItems([]); clearSel();
       return;
     }
     const j = await r.json();
@@ -155,47 +160,68 @@ export default function LiffAdminPage() {
     return { ...item, ...d, ...patch };
   }
 
-async function saveCalendarConfig() {
-  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
-  try {
-    setCfgLoading(true);
-    const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cal1_id: cal1Id || null,
-        cal1_tag: cal1Tag || "CAL1",
-        cal2_id: cal2Id || null,
-        cal2_tag: cal2Tag || "CAL2",
-      }),
-    });
-    if (!r.ok) throw new Error(await r.text());
-    alert("บันทึก Calendar IDs เรียบร้อย");
-  } catch (e: any) {
-    alert(`บันทึกไม่สำเร็จ: ${e.message || e}`);
-  } finally {
-    setCfgLoading(false);
-  }
-}
+  // ------- โหลด/บันทึก Calendar Config (ชุดเดียวพอ) -------
+  useEffect(() => {
+    (async () => {
+      if (!ready || !groupId || !adminKey) return;
+      try {
+        setCfgLoading(true);
+        const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`);
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+        setCal1Id(j.cal1_id ?? "");
+        setCal1Tag(j.cal1_tag ?? "CAL1");
+        setCal2Id(j.cal2_id ?? "");
+        setCal2Tag(j.cal2_tag ?? "CAL2");
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setCfgLoading(false);
+      }
+    })();
+  }, [ready, groupId, adminKey]);
 
-async function syncNow() {
-  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
-  try {
-    setCfgLoading(true);
-    const r = await fetch(`/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
-      method: "POST",
-    });
-    const txt = await r.text();
-    if (!r.ok) throw new Error(txt);
-    alert(txt || "ซิงค์เสร็จแล้ว");
-    // โหลด tasks อีกรอบ เผื่อมีงานใหม่จาก calendar
-    await load();
-  } catch (e: any) {
-    alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
-  } finally {
-    setCfgLoading(false);
+  async function saveCalendarConfig() {
+    if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+    try {
+      setCfgLoading(true);
+      const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cal1_id: cal1Id || null,
+          cal1_tag: cal1Tag || "CAL1",
+          cal2_id: cal2Id || null,
+          cal2_tag: cal2Tag || "CAL2",
+        }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      alert("บันทึก Calendar IDs เรียบร้อย");
+    } catch (e: any) {
+      alert(`บันทึกไม่สำเร็จ: ${e.message || e}`);
+    } finally {
+      setCfgLoading(false);
+    }
   }
-}
+
+  async function syncNow() {
+    if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+    try {
+      setCfgLoading(true);
+      const r = await fetch(`/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
+        method: "POST",
+      });
+      const txt = await r.text();
+      if (!r.ok) throw new Error(txt);
+      alert(txt || "ซิงค์เสร็จแล้ว");
+      await load(); // reload tasks after sync
+    } catch (e: any) {
+      alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
+    } finally {
+      setCfgLoading(false);
+    }
+  }
+
   const saveRow = async (id: string, extra?: Partial<Task>) => {
     const body = { ...(draft[id] || {}), ...(extra || {}) };
     if (!Object.keys(body).length) return;
@@ -211,14 +237,13 @@ async function syncNow() {
 
       if (r.ok) {
         setDraft(d => { const { [id]:_, ...rest } = d; return rest; });
-        // ดึงค่าจริงกลับ (เผื่อ server แก้อะไรเพิ่ม)
-        await load();
+        await load(); // fetch real value from server
         showToast({ type: "ok", text: "บันทึกแล้ว" });
       } else {
         const msg = await r.text();
         showToast({ type: "err", text: msg || "บันทึกไม่สำเร็จ" });
       }
-    } catch (e) {
+    } catch {
       showToast({ type: "err", text: "เครือข่ายผิดพลาด" });
     } finally {
       markSaving(id, false);
@@ -244,7 +269,7 @@ async function syncNow() {
   };
 
   const createRow = async () => {
-    if (!creating.title) return showToast({ type: "err", text: "กรอกชื่องานก่อน" });
+    if (!(creating.title ?? "").trim()) return showToast({ type: "err", text: "กรอกชื่องานก่อน" });
     const body = { group_id: groupId, ...creating };
     try {
       const r = await fetch(`/api/admin/tasks?key=${encodeURIComponent(adminKey)}`, {
@@ -318,15 +343,22 @@ async function syncNow() {
   const firstOfMonth = new Date(y, m, 1);
   const offsetMon = (firstOfMonth.getDay() + 6) % 7;
   const gridStart = new Date(y, m, 1 - offsetMon);
+
+  // ✅ ทำให้ dependency ชัดเจน: เปลี่ยนตามเดือน/ปีเท่านั้น
   const daysGrid: Date[] = useMemo(() => {
     const arr: Date[] = [];
-    for (let i = 0; i < 42; i++) arr.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
+    for (let i = 0; i < 42; i++) {
+      arr.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
+    }
     return arr;
-  }, [gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate()]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [y, m, gridStart.getDate()]); // gridStart ขยับเมื่อ y/m เปลี่ยนอยู่แล้ว
+
   const keyFromDate = (d: Date) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
   const keyFromISO = (iso: string) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+
   const mapByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
     for (const t of items) {
@@ -342,38 +374,9 @@ async function syncNow() {
     });
     return map;
   }, [items]);
+
   const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(firstOfMonth);
   const todayKey = keyFromDate(new Date());
-
-  // state สำหรับ calendar config
-const [cal1Id, setCal1Id] = useState("");
-const [cal1Tag, setCal1Tag] = useState("CAL1");
-const [cal2Id, setCal2Id] = useState("");
-const [cal2Tag, setCal2Tag] = useState("CAL2");
-const [cfgLoading, setCfgLoading] = useState(false);
-
-// โหลด config เมื่อพร้อมและมี groupId/adminKey
-useEffect(() => {
-  (async () => {
-    if (!ready || !groupId || !adminKey) return;
-    try {
-      setCfgLoading(true);
-      const r = await fetch(`/api/admin/calendar-config?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`);
-      if (!r.ok) throw new Error(await r.text());
-      const j = await r.json();
-      setCal1Id(j.cal1_id ?? "");
-      setCal1Tag(j.cal1_tag ?? "CAL1");
-      setCal2Id(j.cal2_id ?? "");
-      setCal2Tag(j.cal2_tag ?? "CAL2");
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCfgLoading(false);
-    }
-  })();
-}, [ready, groupId, adminKey]);
-
-
 
   return (
     <div className="min-h-screen bg-white">
@@ -470,8 +473,8 @@ useEffect(() => {
                  value={Array.isArray(creating.tags)? creating.tags.join(", ") : (creating.tags as any || "")}
                  onChange={e=>setCreating(c=>({...c, tags: parseTags(e.target.value)}))}/>
           <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" type="date"
-                 value={creating.due_at ?? ""}
-                  onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}
+                 value={creating.due_at ? fmtDate(creating.due_at) : ""}
+                 onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}/>
           <button className="md:col-span-12 bg-green-600 text-white px-4 py-3 md:py-2 rounded" onClick={createRow}>+ Add</button>
         </div>
 
@@ -494,7 +497,6 @@ useEffect(() => {
                       className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
                       disabled={isSaving}
                       onClick={() => {
-                        // optimistic
                         setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x) : x));
                         saveRow(t.id);
                       }}
@@ -652,7 +654,6 @@ useEffect(() => {
                         className="px-3 py-2 bg-blue-600 text-white rounded mr-2 disabled:opacity-60"
                         disabled={isSaving}
                         onClick={() => {
-                          // optimistic
                           setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x) : x));
                           saveRow(t.id);
                         }}
@@ -683,41 +684,43 @@ useEffect(() => {
             </tbody>
           </table>
         </div>
-{/* ===== Calendar Settings (ต่อกลุ่ม) ===== */}
-<div className="mt-6 p-4 border rounded-lg bg-slate-50">
-  <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-    <div>
-      <label className="text-sm text-slate-600">Calendar #1 ID (เช่น primary หรือ you@domain)</label>
-      <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Id} onChange={e=>setCal1Id(e.target.value)} placeholder="calendarId 1" />
-    </div>
-    <div>
-      <label className="text-sm text-slate-600">Tag เวลา import</label>
-      <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Tag} onChange={e=>setCal1Tag(e.target.value)} placeholder="เช่น CAL1" />
-    </div>
-    <div>
-      <label className="text-sm text-slate-600">Calendar #2 ID</label>
-      <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Id} onChange={e=>setCal2Id(e.target.value)} placeholder="calendarId 2 (ถ้ามี)" />
-    </div>
-    <div>
-      <label className="text-sm text-slate-600">Tag เวลา import</label>
-      <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Tag} onChange={e=>setCal2Tag(e.target.value)} placeholder="เช่น CAL2" />
-    </div>
-  </div>
 
-  <div className="mt-3 flex gap-2">
-    <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
-      บันทึก Calendar IDs
-    </button>
-    <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
-      ซิงค์จาก Google Calendar ตอนนี้
-    </button>
-  </div>
+        {/* ===== Calendar Settings (ต่อกลุ่ม) ===== */}
+        <div className="mt-6 p-4 border rounded-lg bg-slate-50">
+          <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-slate-600">Calendar #1 ID (เช่น primary หรือ you@domain)</label>
+              <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Id} onChange={e=>setCal1Id(e.target.value)} placeholder="calendarId 1" />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600">Tag เวลา import</label>
+              <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Tag} onChange={e=>setCal1Tag(e.target.value)} placeholder="เช่น CAL1" />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600">Calendar #2 ID</label>
+              <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Id} onChange={e=>setCal2Id(e.target.value)} placeholder="calendarId 2 (ถ้ามี)" />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600">Tag เวลา import</label>
+              <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Tag} onChange={e=>setCal2Tag(e.target.value)} placeholder="เช่น CAL2" />
+            </div>
+          </div>
 
-  <div className="mt-2 text-xs text-slate-500">
-    * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
-  </div>
-</div>
+          <div className="mt-3 flex gap-2">
+            <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
+              บันทึก Calendar IDs
+            </button>
+            <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
+              ซิงค์จาก Google Calendar ตอนนี้
+            </button>
+          </div>
+
+          <div className="mt-2 text-xs text-slate-500">
+            * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
+          </div>
+        </div>
+
         {/* ===== Calendar (Monthly) ===== */}
         <div className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -727,7 +730,9 @@ useEffect(() => {
               <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>เดือนถัดไป →</button>
             </div>
             <div className="flex items-center gap-2">
-              <input type="month" className="border rounded px-2 py-2"
+              <input
+                type="month"
+                className="border rounded px-2 py-2"
                 value={`${monthCursor.getFullYear()}-${String(monthCursor.getMonth()+1).padStart(2,"0")}`}
                 onChange={(e) => {
                   const [yy, mm] = e.target.value.split("-").map(Number);
