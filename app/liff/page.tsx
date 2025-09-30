@@ -491,6 +491,17 @@ export default function LiffAdminPage() {
               >
                 เปิด Kanban
               </button>
+              <button
+  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-3 md:py-2 rounded"
+  onClick={() => {
+    const url = new URL("/liff/dashboard", location.origin);
+    if (groupId) url.searchParams.set("group_id", groupId);
+    if (adminKey) url.searchParams.set("key", adminKey);
+    window.open(url.toString(), "_self");
+  }}
+>
+  เปิด Dashboard
+</button>
             </div>
           </div>
         </div>
