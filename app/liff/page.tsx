@@ -56,6 +56,16 @@ const TagBadge: React.FC<{ label: string }> = ({ label }) => {
   );
 };
 
+// badge เล็กสำหรับแสดงในปฏิทิน
+const TagChip: React.FC<{ label: string }> = ({ label }) => {
+  const cls = TAG_COLORS[label] || "bg-gray-100 text-gray-700 border-gray-200";
+  return (
+    <span className={`inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium border ${cls}`}>
+      {label}
+    </span>
+  );
+};
+
 export default function LiffAdminPage() {
   // state สำหรับ calendar config (—> ย้ายไว้ที่เดียว ไม่ซ้ำซ้อน)
   const [cal1Id, setCal1Id] = useState("");
@@ -63,7 +73,7 @@ export default function LiffAdminPage() {
   const [cal2Id, setCal2Id] = useState("");
   const [cal2Tag, setCal2Tag] = useState("CAL2");
   const [cfgLoading, setCfgLoading] = useState(false);
-
+ const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
@@ -779,11 +789,25 @@ export default function LiffAdminPage() {
                     {dayTasks.length > 0 && (<span className="text-[10px] text-gray-500">{dayTasks.length} งาน</span>)}
                   </div>
                   <div className="space-y-1 overflow-y-auto">
-                    {dayTasks.slice(0, 4).map(t => (
-                      <div key={t.id} className="text-[11px] md:text-xs px-1 py-0.5 rounded bg-blue-50 border border-blue-100">
-                        <span className="font-mono">{t.code}</span> — {t.title}
-                      </div>
-                    ))}
+{dayTasks.slice(0, 4).map(t => (
+  <button
+    key={t.id}
+    onClick={() => setSelectedTask(t)}
+    className="w-full text-left text-[11px] md:text-xs px-1.5 py-1 rounded border hover:shadow-sm
+               bg-white/70 hover:bg-white border-slate-200 flex items-center gap-1"
+  >
+    {/* จุดสีเล็ก ๆ สื่อสถานะ (optional) */}
+    <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+
+    {/* ชื่อเรื่อง (truncate) */}
+    <span className="truncate flex-1">{t.title}</span>
+
+    {/* แท็กเล็ก ๆ ห้อยด้านขวา (โผล่แค่ 1-2 อัน) */}
+    <span className="flex items-center gap-1 shrink-0">
+      {(t.tags ?? []).slice(0, 2).map(tag => <TagChip key={tag} label={tag} />)}
+    </span>
+  </button>
+))}
                     {dayTasks.length > 4 && (<div className="text-[11px] text-gray-500">+{dayTasks.length - 4} more…</div>)}
                   </div>
                 </div>
@@ -795,7 +819,56 @@ export default function LiffAdminPage() {
             แสดงงานตาม <b>due date</b> (เวลาไทย). งานที่ไม่มี due date จะไม่แสดงในปฏิทิน
           </div>
         </div>
+        {/* ===== Task Detail Modal ===== */}
+{selectedTask && (
+  <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center px-4"
+       onClick={() => setSelectedTask(null)}>
+    <div
+      className="w-full max-w-lg rounded-2xl bg-white shadow-lg border border-slate-200 p-4 md:p-5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <h3 className="text-base md:text-lg font-semibold text-slate-900 leading-snug">
+          {selectedTask.title}
+        </h3>
+        <button
+          className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+          onClick={() => setSelectedTask(null)}
+        >
+          ปิด
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {(selectedTask.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
+      </div>
+
+      <dl className="space-y-2 text-sm text-slate-700 mb-3">
+        <div className="flex">
+          <dt className="w-24 shrink-0 text-slate-500">กำหนดส่ง</dt>
+          <dd>{fmtDate(selectedTask.due_at)}</dd>
+        </div>
+        <div className="flex">
+          <dt className="w-24 shrink-0 text-slate-500">สถานะ</dt>
+          <dd>{selectedTask.status}</dd>
+        </div>
+        <div className="flex">
+          <dt className="w-24 shrink-0 text-slate-500">ความสำคัญ</dt>
+          <dd>{selectedTask.priority}</dd>
+        </div>
+      </dl>
+
+      {selectedTask.description && (
+        <div className="text-sm text-slate-800 whitespace-pre-wrap border-t pt-3">
+          {selectedTask.description}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
       </main>
+      
     </div>
   );
 }
