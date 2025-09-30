@@ -493,6 +493,67 @@ export default function LiffAdminPage() {
               </button>
             </div>
           </div>
+          {/* ===== Bulk actions bar (show when any rows selected) ===== */}
+{selected.size > 0 && (
+  <div className="sticky top-14 z-40 mb-4 rounded-lg border bg-amber-50 text-slate-800 px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="font-medium">
+        เลือกแล้ว {selected.size} งาน
+      </span>
+
+      {/* เปลี่ยนสถานะรวดเดียว */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-slate-600">สถานะ</label>
+        <select
+          className="border rounded px-2 py-1 text-sm"
+          value={bulkStatus}
+          onChange={(e) => setBulkStatus(e.target.value as Task["status"])}
+        >
+          {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <button
+          className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm"
+          onClick={bulkApplyStatus}
+        >
+          อัปเดตสถานะ
+        </button>
+      </div>
+
+      {/* ตั้ง due date รวดเดียว */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-slate-600">กำหนดส่ง</label>
+        <input
+          type="date"
+          className="border rounded px-2 py-1 text-sm"
+          value={bulkDue}
+          onChange={(e) => setBulkDue(e.target.value)}
+        />
+        <button
+          className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm"
+          onClick={bulkApplyDue}
+        >
+          ตั้งกำหนดส่ง
+        </button>
+      </div>
+
+      {/* ลบที่เลือก */}
+      <div className="ml-auto flex items-center gap-2">
+        <button
+          className="px-3 py-1.5 rounded bg-red-600 text-white text-sm"
+          onClick={bulkDelete}
+        >
+          ลบที่เลือก
+        </button>
+        <button
+          className="px-3 py-1.5 rounded border text-sm"
+          onClick={clearSel}
+        >
+          ยกเลิกเลือก
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         </div>
 
         {/* ===== Create row ===== */}
