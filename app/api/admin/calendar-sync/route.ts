@@ -1,36 +1,32 @@
+// app/api/admin/calendar-sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { google, calendar_v3 } from "googleapis";
 
 export const runtime = "nodejs";
 
-/* helpers */
+/* ---------- helpers ---------- */
 function assertKey(req: NextRequest) {
   const key = new URL(req.url).searchParams.get("key");
-  if (!key || key !== process.env.ADMIN_KEY) throw new NextResponse("unauthorized", { status: 401 });
+  if (!key || key !== process.env.ADMIN_KEY) {
+    throw new NextResponse("unauthorized", { status: 401 });
+  }
 }
+
 function getServiceAccountCreds() {
   const client_email = process.env.GOOGLE_CLIENT_EMAIL;
   let private_key = process.env.GOOGLE_PRIVATE_KEY;
-  if (!client_email || !private_key) throw new Error("GOOGLE_CLIENT_EMAIL/GOOGLE_PRIVATE_KEY missing");
+  if (!client_email || !private_key) {
+    throw new Error("GOOGLE_CLIENT_EMAIL/GOOGLE_PRIVATE_KEY missing");
+  }
   private_key = private_key.replace(/\\n/g, "\n");
   return { client_email, private_key };
 }
+
 function toDateInTZ(dateOnly: string, tz: string, end = false): string {
   const base = end ? "T23:59:00" : "T00:00:00";
   const offset = tz === "Asia/Bangkok" ? "+07:00" : "Z";
   return new Date(`${dateOnly}${base}${offset}`).toISOString();
-}
-
-// map color name → colorId (Google preset)
-const COLOR_NAME_TO_ID: Record<string, string> = {
-  lavender: "1", sage: "2", grape: "3", flamingo: "4", banana: "5",
-  tangerine: "6", peacock: "7", graphite: "8", blueberry: "9", basil: "10", tomato: "11",
-};
-function normColor(value?: string | null) {
-  if (!value) return null;
-  const v = String(value).trim().toLowerCase();
-  return COLOR_NAME_TO_ID[v] ?? String(value);
 }
 
 async function upsertEvent(
@@ -39,8 +35,12 @@ async function upsertEvent(
   ev: calendar_v3.Schema$Event,
   tz = "Asia/Bangkok",
 ) {
-  const startISO = ev.start?.dateTime ?? (ev.start?.date ? toDateInTZ(ev.start.date, tz, false) : null);
-  const endISO   = ev.end?.dateTime   ?? (ev.end?.date   ? toDateInTZ(ev.end.date, tz, true)   : null);
+  const startISO =
+    ev.start?.dateTime ??
+    (ev.start?.date ? toDateInTZ(ev.start.date, tz, false) : null);
+  const endISO =
+    ev.end?.dateTime ??
+    (ev.end?.date ? toDateInTZ(ev.end.date, tz, true) : null);
 
   await sql/* sql */`
     insert into public.external_calendar_events(
@@ -67,7 +67,7 @@ async function upsertEvent(
   `;
 }
 
-/* handler */
+/* ---------- handler ---------- */
 export async function POST(req: NextRequest) {
   try { assertKey(req); } catch (res: any) { return res; }
 
@@ -75,16 +75,13 @@ export async function POST(req: NextRequest) {
   const group_id = url.searchParams.get("group_id");
   if (!group_id) return new NextResponse("group_id required", { status: 400 });
 
-  // query options
   const isDebug = url.searchParams.get("debug") === "1";
   const calOverride = url.searchParams.get("cal_id") || undefined;
   const sinceOverride = url.searchParams.get("since") || undefined; // YYYY-MM-01
-  // 👉 force flamingo by default; allow override via ?color=
-  const colorParam = (url.searchParams.get("color") || "flamingo").trim();
-  const colorFilter = normColor(colorParam); // “flamingo” → "4"
+  const wantedColor = (url.searchParams.get("color") || "4").trim(); // default = Flamingo
 
   try {
-    // load config (schema: no tz/color columns)
+    // โหลด config ตาม schema ที่คุณมีจริง
     const rows = await sql/* sql */`
       select group_id, cal1_id, cal1_tag, cal2_id, cal2_tag, fetch_from, last_synced_at
       from public.calendar_configs
@@ -92,21 +89,23 @@ export async function POST(req: NextRequest) {
       limit 1
     `;
     if (!rows.length) return new NextResponse("settings not found for this group", { status: 404 });
+
     const settings = rows[0] as {
       cal1_id?: string | null; cal1_tag?: string | null;
       cal2_id?: string | null; cal2_tag?: string | null;
       fetch_from?: string | null;
     };
 
-    // auth
+    // Google auth
     const { client_email, private_key } = getServiceAccountCreds();
     const auth = new google.auth.JWT({
-      email: client_email, key: private_key,
+      email: client_email,
+      key: private_key,
       scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
     });
     const gcal = google.calendar({ version: "v3", auth });
 
-    // time range
+    // ช่วงเวลา
     const tz = "Asia/Bangkok";
     const since = sinceOverride
       ? new Date(`${sinceOverride}T00:00:00+07:00`)
@@ -116,7 +115,7 @@ export async function POST(req: NextRequest) {
     const timeMin = since.toISOString();
     const timeMax = plus6.toISOString();
 
-    // calendars
+    // เลือกปฏิทิน
     const calendars: Array<{ id: string; tag: string }> = [];
     if (calOverride) {
       calendars.push({ id: calOverride, tag: "OVERRIDE" });
@@ -128,7 +127,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "no calendar configured", group_id }, { status: 400 });
     }
 
-    const diag: Array<{ calendarId: string; colorFilter: string | null; fetched: number; kept: number; sample: any[] }> = [];
+    const diag: Array<{ calendarId: string; fetched: number; kept: number; sample: any[] }> = [];
     let total = 0;
 
     for (const { id: calId } of calendars) {
@@ -146,12 +145,12 @@ export async function POST(req: NextRequest) {
           maxResults: 2500,
         });
 
-        const events = (data.items ?? []) as calendar_v3.Schema$Event[];
+        const events = data.items ?? [];
         fetched += events.length;
 
         for (const ev of events) {
-          // keep only flamingo (or overridden color)
-          if (colorFilter && ev.colorId && ev.colorId !== colorFilter) continue;
+          // ⭐ กรองแบบเข้มงวด: ต้องมี colorId และเท่ากับ wantedColor เท่านั้น
+          if ((ev.colorId ?? null) !== wantedColor) continue;
 
           kept++;
           if (sample.length < 3) {
@@ -169,11 +168,11 @@ export async function POST(req: NextRequest) {
         pageToken = data.nextPageToken || undefined;
       } while (pageToken);
 
-      diag.push({ calendarId: calId, colorFilter, fetched, kept, sample });
+      diag.push({ calendarId: calId, fetched, kept, sample });
     }
 
     if (isDebug) {
-      return NextResponse.json({ ok: true, mode: "debug", group_id, timeMin, timeMax, colorFilter, calendars: diag });
+      return NextResponse.json({ ok: true, mode: "debug", group_id, timeMin, timeMax, wantedColor, calendars: diag });
     }
 
     await sql/* sql */`
@@ -182,19 +181,11 @@ export async function POST(req: NextRequest) {
       where group_id = ${group_id}
     `;
 
-    return NextResponse.json({ ok: true, group_id, total, timeMin, timeMax, colorFilter, calendars: diag });
+    return NextResponse.json({ ok: true, group_id, total, timeMin, timeMax, wantedColor, calendars: diag });
   } catch (e: any) {
-    const status = e?.response?.status ?? 500;
-    const body = e?.response?.data?.error ?? null;
     return new NextResponse(
-      JSON.stringify({
-        ok: false,
-        where: "handler",
-        error: body?.message || e?.message || String(e),
-        status,
-        details: body ?? null,
-      }),
-      { status, headers: { "content-type": "application/json" } },
+      JSON.stringify({ ok: false, where: "handler", error: e?.message || String(e) }),
+      { status: 500, headers: { "content-type": "application/json" } },
     );
   }
 }
