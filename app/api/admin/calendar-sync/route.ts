@@ -7,9 +7,7 @@ export const runtime = "nodejs";
 /* helpers */
 function assertKey(req: NextRequest) {
   const key = new URL(req.url).searchParams.get("key");
-  if (!key || key !== process.env.ADMIN_KEY) {
-    throw new NextResponse("unauthorized", { status: 401 });
-  }
+  if (!key || key !== process.env.ADMIN_KEY) throw new NextResponse("unauthorized", { status: 401 });
 }
 function getServiceAccountCreds() {
   const client_email = process.env.GOOGLE_CLIENT_EMAIL;
@@ -23,7 +21,24 @@ function toDateInTZ(dateOnly: string, tz: string, end = false): string {
   const offset = tz === "Asia/Bangkok" ? "+07:00" : "Z";
   return new Date(`${dateOnly}${base}${offset}`).toISOString();
 }
-async function upsertEvent(group_id: string, calendar_id: string, ev: calendar_v3.Schema$Event, tz = "Asia/Bangkok") {
+
+// map color name → colorId (Google preset)
+const COLOR_NAME_TO_ID: Record<string, string> = {
+  lavender: "1", sage: "2", grape: "3", flamingo: "4", banana: "5",
+  tangerine: "6", peacock: "7", graphite: "8", blueberry: "9", basil: "10", tomato: "11",
+};
+function normColor(value?: string | null) {
+  if (!value) return null;
+  const v = String(value).trim().toLowerCase();
+  return COLOR_NAME_TO_ID[v] ?? String(value);
+}
+
+async function upsertEvent(
+  group_id: string,
+  calendar_id: string,
+  ev: calendar_v3.Schema$Event,
+  tz = "Asia/Bangkok",
+) {
   const startISO = ev.start?.dateTime ?? (ev.start?.date ? toDateInTZ(ev.start.date, tz, false) : null);
   const endISO   = ev.end?.dateTime   ?? (ev.end?.date   ? toDateInTZ(ev.end.date, tz, true)   : null);
 
@@ -60,28 +75,27 @@ export async function POST(req: NextRequest) {
   const group_id = url.searchParams.get("group_id");
   if (!group_id) return new NextResponse("group_id required", { status: 400 });
 
-  // debug flags
+  // query options
   const isDebug = url.searchParams.get("debug") === "1";
   const calOverride = url.searchParams.get("cal_id") || undefined;
   const sinceOverride = url.searchParams.get("since") || undefined; // YYYY-MM-01
+  // 👉 force flamingo by default; allow override via ?color=
+  const colorParam = (url.searchParams.get("color") || "flamingo").trim();
+  const colorFilter = normColor(colorParam); // “flamingo” → "4"
 
   try {
-    // โหลด settings ให้ตรงสคีมา "fetch_from" (ไม่มี cal*_color)
+    // load config (schema: no tz/color columns)
     const rows = await sql/* sql */`
-      select group_id,
-             cal1_id, cal1_tag,
-             cal2_id, cal2_tag,
-             fetch_from, tz, last_synced_at
+      select group_id, cal1_id, cal1_tag, cal2_id, cal2_tag, fetch_from, last_synced_at
       from public.calendar_configs
       where group_id = ${group_id}
       limit 1
     `;
     if (!rows.length) return new NextResponse("settings not found for this group", { status: 404 });
-
     const settings = rows[0] as {
       cal1_id?: string | null; cal1_tag?: string | null;
       cal2_id?: string | null; cal2_tag?: string | null;
-      fetch_from?: string | null; tz?: string | null;
+      fetch_from?: string | null;
     };
 
     // auth
@@ -92,8 +106,8 @@ export async function POST(req: NextRequest) {
     });
     const gcal = google.calendar({ version: "v3", auth });
 
-    // ช่วงเวลา: ใช้ sinceOverride > fetch_from > default
-    const tz = settings.tz || "Asia/Bangkok";
+    // time range
+    const tz = "Asia/Bangkok";
     const since = sinceOverride
       ? new Date(`${sinceOverride}T00:00:00+07:00`)
       : (settings.fetch_from ? new Date(`${settings.fetch_from}T00:00:00+07:00`) : new Date("2025-09-01T00:00:00+07:00"));
@@ -102,7 +116,7 @@ export async function POST(req: NextRequest) {
     const timeMin = since.toISOString();
     const timeMax = plus6.toISOString();
 
-    // calendars (ไม่มี color filter)
+    // calendars
     const calendars: Array<{ id: string; tag: string }> = [];
     if (calOverride) {
       calendars.push({ id: calOverride, tag: "OVERRIDE" });
@@ -114,7 +128,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "no calendar configured", group_id }, { status: 400 });
     }
 
-    const diag: Array<{ calendarId: string; fetched: number; kept: number; sample: any[] }> = [];
+    const diag: Array<{ calendarId: string; colorFilter: string | null; fetched: number; kept: number; sample: any[] }> = [];
     let total = 0;
 
     for (const { id: calId } of calendars) {
@@ -136,12 +150,16 @@ export async function POST(req: NextRequest) {
         fetched += events.length;
 
         for (const ev of events) {
+          // keep only flamingo (or overridden color)
+          if (colorFilter && ev.colorId && ev.colorId !== colorFilter) continue;
+
           kept++;
           if (sample.length < 3) {
             const s = ev.start?.dateTime ?? (ev.start?.date ? `${ev.start.date} (all-day)` : null);
             const e = ev.end?.dateTime   ?? (ev.end?.date   ? `${ev.end.date} (all-day)`   : null);
-            sample.push({ id: ev.id ?? null, summary: ev.summary ?? null, start: s, end: e, status: ev.status ?? null });
+            sample.push({ id: ev.id ?? null, summary: ev.summary ?? null, start: s, end: e, colorId: ev.colorId ?? null, status: ev.status ?? null });
           }
+
           if (!isDebug) {
             await upsertEvent(group_id, calId, ev, tz);
             total++;
@@ -151,11 +169,11 @@ export async function POST(req: NextRequest) {
         pageToken = data.nextPageToken || undefined;
       } while (pageToken);
 
-      diag.push({ calendarId: calId, fetched, kept, sample });
+      diag.push({ calendarId: calId, colorFilter, fetched, kept, sample });
     }
 
     if (isDebug) {
-      return NextResponse.json({ ok: true, mode: "debug", group_id, timeMin, timeMax, tz, calendars: diag });
+      return NextResponse.json({ ok: true, mode: "debug", group_id, timeMin, timeMax, colorFilter, calendars: diag });
     }
 
     await sql/* sql */`
@@ -164,7 +182,7 @@ export async function POST(req: NextRequest) {
       where group_id = ${group_id}
     `;
 
-    return NextResponse.json({ ok: true, group_id, total, timeMin, timeMax, tz, calendars: diag });
+    return NextResponse.json({ ok: true, group_id, total, timeMin, timeMax, colorFilter, calendars: diag });
   } catch (e: any) {
     const status = e?.response?.status ?? 500;
     const body = e?.response?.data?.error ?? null;
