@@ -775,7 +775,19 @@ export default function KanbanPage() {
                   />
                 </div>
               </div>
-
+              
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              <button onClick={closeEditor} className={btn("ghost")}>
+                ปิด
+              </button>
+              <button onClick={saveProgress} className={btn("primary")}>
+                บันทึกความคืบหน้า
+              </button>
+              <button onClick={markDone} className={btn("danger")}>
+                ปิดงาน (100% & Done)
+              </button>
+            </div>
+              
               <div className="mt-3 flex justify-end">
                 <button onClick={addToCalendarServer} className={btn("primary")}>
                   เพิ่มใน Google Calendar
@@ -789,17 +801,6 @@ export default function KanbanPage() {
             </div>
 
             {/* Footer actions */}
-            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-              <button onClick={closeEditor} className={btn("ghost")}>
-                ปิด
-              </button>
-              <button onClick={saveProgress} className={btn("primary")}>
-                บันทึกความคืบหน้า
-              </button>
-              <button onClick={markDone} className={btn("danger")}>
-                ปิดงาน (100% & Done)
-              </button>
-            </div>
           </div>
         </div>
       )}
