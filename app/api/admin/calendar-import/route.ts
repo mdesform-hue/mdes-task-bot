@@ -29,6 +29,27 @@ export async function POST(req: NextRequest) {
   if (!group_id) return new NextResponse("group_id required", { status: 400 });
 
   try {
+    // โหลด config เพื่อ map calendar_id -> tag
+    const cfgRows = await sql/* sql */`
+      select group_id, cal1_id, cal1_tag, cal2_id, cal2_tag
+      from public.calendar_configs
+      where group_id = ${group_id}
+      limit 1
+    `;
+    if (!cfgRows.length) {
+      return new NextResponse("settings not found for this group", { status: 404 });
+    }
+    const cfg = cfgRows[0] as {
+      cal1_id?: string | null; cal1_tag?: string | null;
+      cal2_id?: string | null; cal2_tag?: string | null;
+    };
+
+    const cal1Id = (cfg.cal1_id || "").trim();
+    const cal2Id = (cfg.cal2_id || "").trim();
+    const cal1Tag = (cfg.cal1_tag || "CAL1").trim();
+    const cal2Tag = (cfg.cal2_tag || "CAL2").trim();
+
+    // ดึงจาก mirror เฉพาะสีที่ต้องการ (Flamingo = '4')
     const events = await sql/* sql */`
       select calendar_id, google_event_id, summary, description, start_at, end_at, html_link, color_id
       from public.external_calendar_events
@@ -45,10 +66,16 @@ export async function POST(req: NextRequest) {
       const title = ev.summary || "(ไม่มีชื่ออีเวนต์)";
       const desc  = ev.html_link ? `${ev.html_link}\n\n${ev.description ?? ""}` : (ev.description ?? null);
       const dueAt = ev.start_at ?? null;
-      const tags = ['calendar']; // จะ map ตาม calendar_id เป็น CAL1/CAL2 ก็ได้
+
+      // map tag ตาม calendar_id ต้นทาง
+      let tag = "CAL";
+      if (cal1Id && ev.calendar_id === cal1Id) tag = cal1Tag;
+      else if (cal2Id && ev.calendar_id === cal2Id) tag = cal2Tag;
 
       if (sample.length < 3) {
-        sample.push({ code, title, dueAt, colorId: ev.color_id, calendar_id: ev.calendar_id });
+        sample.push({
+          code, title, dueAt, colorId: ev.color_id, calendar_id: ev.calendar_id, tag
+        });
       }
 
       if (!debug) {
@@ -66,7 +93,7 @@ export async function POST(req: NextRequest) {
             ${0},
             ${'todo'},
             ${'medium'},
-            ${tags},
+            ${[tag]},             -- << ใส่ tag ตาม cal1/cal2
             ${'gcal'},
             ${ev.google_event_id},
             ${ev.calendar_id}
@@ -75,6 +102,7 @@ export async function POST(req: NextRequest) {
             title = excluded.title,
             description = excluded.description,
             due_at = excluded.due_at,
+            tags = excluded.tags,           -- อัปเดต tag หากเปลี่ยนปฏิทิน
             updated_at = now()
         `;
         imported++;
