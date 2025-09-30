@@ -46,12 +46,20 @@ const TAG_COLORS: Record<string, string> = {
   CAL1: "bg-green-100 text-green-700 border-green-200",
   CAL2: "bg-purple-100 text-purple-700 border-purple-200",
 };
+
+// 🏷️ ปรับ label ให้ human-readable: CAL1 → กพส, CAL2 → กบม.
+const TAG_LABELS: Record<string, string> = {
+  CAL1: "กพส",
+  CAL2: "กบม.",
+};
+
 // render badge ช่วยให้ reuse ได้
 const TagBadge: React.FC<{ label: string }> = ({ label }) => {
   const cls = TAG_COLORS[label] || "bg-gray-100 text-gray-700 border-gray-200";
+  const showLabel = TAG_LABELS[label] || label;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
-      {label}
+      {showLabel}
     </span>
   );
 };
@@ -59,9 +67,10 @@ const TagBadge: React.FC<{ label: string }> = ({ label }) => {
 // badge เล็กสำหรับแสดงในปฏิทิน
 const TagChip: React.FC<{ label: string }> = ({ label }) => {
   const cls = TAG_COLORS[label] || "bg-gray-100 text-gray-700 border-gray-200";
+  const showLabel = TAG_LABELS[label] || label;
   return (
     <span className={`inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium border ${cls}`}>
-      {label}
+      {showLabel}
     </span>
   );
 };
@@ -73,7 +82,7 @@ export default function LiffAdminPage() {
   const [cal2Id, setCal2Id] = useState("");
   const [cal2Tag, setCal2Tag] = useState("CAL2");
   const [cfgLoading, setCfgLoading] = useState(false);
- const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [ready, setReady] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
@@ -492,80 +501,82 @@ export default function LiffAdminPage() {
                 เปิด Kanban
               </button>
               <button
-  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-3 md:py-2 rounded"
-  onClick={() => {
-    const url = new URL("/liff/dashboard", location.origin);
-    if (groupId) url.searchParams.set("group_id", groupId);
-    if (adminKey) url.searchParams.set("key", adminKey);
-    window.open(url.toString(), "_self");
-  }}
->
-  เปิด Dashboard
-</button>
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-3 md:py-2 rounded"
+                onClick={() => {
+                  const url = new URL("/liff/dashboard", location.origin);
+                  if (groupId) url.searchParams.set("group_id", groupId);
+                  if (adminKey) url.searchParams.set("key", adminKey);
+                  window.open(url.toString(), "_self");
+                }}
+              >
+                เปิด Dashboard
+              </button>
             </div>
           </div>
         </div>
-   {/* ===== Bulk actions bar (show when any rows selected) ===== */}
-{selected.size > 0 && (
-  <div className="sticky top-14 z-40 mb-4 rounded-lg border bg-amber-50 text-slate-800 px-3 py-2">
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="font-medium">
-        เลือกแล้ว {selected.size} งาน
-      </span>
 
-      {/* เปลี่ยนสถานะรวดเดียว */}
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-slate-600">สถานะ</label>
-        <select
-          className="border rounded px-2 py-1 text-sm"
-          value={bulkStatus}
-          onChange={(e) => setBulkStatus(e.target.value as Task["status"])}
-        >
-          {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <button
-          className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm"
-          onClick={bulkApplyStatus}
-        >
-          อัปเดตสถานะ
-        </button>
-      </div>
+        {/* ===== Bulk actions bar (show when any rows selected) ===== */}
+        {selected.size > 0 && (
+          <div className="sticky top-14 z-40 mb-4 rounded-lg border bg-amber-50 text-slate-800 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">
+                เลือกแล้ว {selected.size} งาน
+              </span>
 
-      {/* ตั้ง due date รวดเดียว */}
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-slate-600">กำหนดส่ง</label>
-        <input
-          type="date"
-          className="border rounded px-2 py-1 text-sm"
-          value={bulkDue}
-          onChange={(e) => setBulkDue(e.target.value)}
-        />
-        <button
-          className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm"
-          onClick={bulkApplyDue}
-        >
-          ตั้งกำหนดส่ง
-        </button>
-      </div>
+              {/* เปลี่ยนสถานะรวดเดียว */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-600">สถานะ</label>
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={bulkStatus}
+                  onChange={(e) => setBulkStatus(e.target.value as Task["status"])}
+                >
+                  {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button
+                  className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm"
+                  onClick={bulkApplyStatus}
+                >
+                  อัปเดตสถานะ
+                </button>
+              </div>
 
-      {/* ลบที่เลือก */}
-      <div className="ml-auto flex items-center gap-2">
-        <button
-          className="px-3 py-1.5 rounded bg-red-600 text-white text-sm"
-          onClick={bulkDelete}
-        >
-          ลบที่เลือก
-        </button>
-        <button
-          className="px-3 py-1.5 rounded border text-sm"
-          onClick={clearSel}
-        >
-          ยกเลิกเลือก
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              {/* ตั้ง due date รวดเดียว */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-600">กำหนดส่ง</label>
+                <input
+                  type="date"
+                  className="border rounded px-2 py-1 text-sm"
+                  value={bulkDue}
+                  onChange={(e) => setBulkDue(e.target.value)}
+                />
+                <button
+                  className="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm"
+                  onClick={bulkApplyDue}
+                >
+                  ตั้งกำหนดส่ง
+                </button>
+              </div>
+
+              {/* ลบที่เลือก */}
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  className="px-3 py-1.5 rounded bg-red-600 text-white text-sm"
+                  onClick={bulkDelete}
+                >
+                  ลบที่เลือก
+                </button>
+                <button
+                  className="px-3 py-1.5 rounded border text-sm"
+                  onClick={clearSel}
+                >
+                  ยกเลิกเลือก
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ===== Create row ===== */}
         <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
           <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
@@ -663,19 +674,22 @@ export default function LiffAdminPage() {
 
         {/* ===== Desktop: Table (controlled + optimistic) ===== */}
         <div className="overflow-x-auto hidden md:block">
-          <table className="w-full border text-sm">
-            <thead className="bg-gray-100">
+          {/* ⬇️ ปรับขนาดตัวอักษรและระยะห่าง: text-base + leading-snug, และเพิ่ม padding ในหัว/เซลล์ */}
+          <table className="w-full border text-base leading-snug">
+            <thead className="bg-gray-100 text-slate-800 font-medium">
               <tr>
-                <th className="p-2 text-center w-8"><input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} /></th>
-                <th className="p-2 text-left">CODE</th>
-                <th className="p-2 text-left">Title</th>
-                <th className="p-2 text-left">Desc</th>
-                <th className="p-2">Due</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Priority</th>
-                <th className="p-2">Tags</th>
-                <th className="p-2">Progress</th>
-                <th className="p-2">Actions</th>
+                <th className="px-3 py-2.5 text-center w-10">
+                  <input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} />
+                </th>
+                <th className="px-3 py-2.5 text-left">CODE</th>
+                <th className="px-3 py-2.5 text-left">Title</th>
+                <th className="px-3 py-2.5 text-left">Desc</th>
+                <th className="px-3 py-2.5">Due</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Priority</th>
+                <th className="px-3 py-2.5">Tags</th>
+                <th className="px-3 py-2.5">Progress</th>
+                <th className="px-3 py-2.5">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -686,63 +700,80 @@ export default function LiffAdminPage() {
 
                 return (
                   <tr key={t.id} className="border-t">
-                    <td className="p-2 text-center">
+                    <td className="px-3 py-2.5 text-center">
                       <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
                     </td>
-                    <td className="p-2 font-mono">{t.code}</td>
 
-                    <td className="p-2">
-                      <input className="border px-2 py-2 w-full rounded"
-                             value={cur.title}
-                             onChange={e=>change(t.id,{ title:e.target.value })}/>
+                    <td className="px-3 py-2.5 font-mono text-slate-800">{t.code}</td>
+
+                    <td className="px-3 py-2.5">
+                      <input
+                        className="border px-2 py-2 w-full rounded text-base"
+                        value={cur.title}
+                        onChange={e=>change(t.id,{ title:e.target.value })}
+                      />
                     </td>
 
-                    <td className="p-2">
-                      <input className="border px-2 py-2 w-full rounded"
-                             value={cur.description ?? ""}
-                             onChange={e=>change(t.id,{ description:e.target.value })}/>
+                    <td className="px-3 py-2.5">
+                      <input
+                        className="border px-2 py-2 w-full rounded text-base"
+                        value={cur.description ?? ""}
+                        onChange={e=>change(t.id,{ description:e.target.value })}
+                      />
                     </td>
 
-                    <td className="p-2 text-center">
-                      <input className="border px-2 py-2 rounded" type="date"
-                             value={fmtDate(cur.due_at)}
-                             onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
+                    <td className="px-3 py-2.5 text-center">
+                      <input
+                        className="border px-2 py-2 rounded text-base"
+                        type="date"
+                        value={fmtDate(cur.due_at)}
+                        onChange={e=>change(t.id,{ due_at: e.target.value || null })}
+                      />
                     </td>
 
-                    <td className="p-2 text-center">
-                      <select className="border px-2 py-2 rounded"
-                              value={cur.status}
-                              onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
+                    <td className="px-3 py-2.5 text-center">
+                      <select
+                        className="border px-2 py-2 rounded text-base"
+                        value={cur.status}
+                        onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}
+                      >
                         {STATUS.map(s=> <option key={s} value={s}>{s}</option>)}
                       </select>
                     </td>
 
-                    <td className="p-2 text-center">
-                      <select className="border px-2 py-2 rounded"
-                              value={cur.priority}
-                              onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}>
+                    <td className="px-3 py-2.5 text-center">
+                      <select
+                        className="border px-2 py-2 rounded text-base"
+                        value={cur.priority}
+                        onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}
+                      >
                         {PRIORITIES.map(p=> <option key={p} value={p}>{p}</option>)}
                       </select>
                     </td>
 
-                    <td className="p-2">
-                      {/* ✅ แสดง badge ของทุกแท็ก */}
+                    <td className="px-3 py-2.5">
+                      {/* ✅ แสดง badge ของทุกแท็ก (ใช้ label ไทยหากเป็น CAL1/CAL2) */}
                       <div className="flex flex-wrap gap-1 mb-1">
                         {(cur.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
                       </div>
                       {/* ช่องแก้ไขแท็กตามเดิม */}
-                      <input className="border px-2 py-2 w-full rounded"
-                             value={tagsToStr(cur.tags)}
-                             onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
+                      <input
+                        className="border px-2 py-2 w-full rounded text-base"
+                        value={tagsToStr(cur.tags)}
+                        onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}
+                      />
                     </td>
 
-                    <td className="p-2 text-center">
-                      <input className="border px-2 py-2 w-20 text-center rounded" type="number" min={0} max={100}
-                             value={cur.progress ?? 0}
-                             onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
+                    <td className="px-3 py-2.5 text-center">
+                      <input
+                        className="border px-2 py-2 w-24 text-center rounded text-base"
+                        type="number" min={0} max={100}
+                        value={cur.progress ?? 0}
+                        onChange={e=>change(t.id,{ progress: Number(e.target.value) })}
+                      />
                     </td>
 
-                    <td className="p-2 text-center">
+                    <td className="px-3 py-2.5 text-center">
                       <button
                         className="px-3 py-2 bg-blue-600 text-white rounded mr-2 disabled:opacity-60"
                         disabled={isSaving}
@@ -860,25 +891,25 @@ export default function LiffAdminPage() {
                     {dayTasks.length > 0 && (<span className="text-[10px] text-gray-500">{dayTasks.length} งาน</span>)}
                   </div>
                   <div className="space-y-1 overflow-y-auto">
-{dayTasks.slice(0, 4).map(t => (
-  <button
-    key={t.id}
-    onClick={() => setSelectedTask(t)}
-    className="w-full text-left text-[11px] md:text-xs px-1.5 py-1 rounded border hover:shadow-sm
-               bg-white/70 hover:bg-white border-slate-200 flex items-center gap-1"
-  >
-    {/* จุดสีเล็ก ๆ สื่อสถานะ (optional) */}
-    <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                    {dayTasks.slice(0, 4).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedTask(t)}
+                        className="w-full text-left text-[11px] md:text-xs px-1.5 py-1 rounded border hover:shadow-sm
+                                   bg-white/70 hover:bg-white border-slate-200 flex items-center gap-1"
+                      >
+                        {/* จุดสีเล็ก ๆ สื่อสถานะ (optional) */}
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
 
-    {/* ชื่อเรื่อง (truncate) */}
-    <span className="truncate flex-1">{t.title}</span>
+                        {/* ชื่อเรื่อง (truncate) */}
+                        <span className="truncate flex-1">{t.title}</span>
 
-    {/* แท็กเล็ก ๆ ห้อยด้านขวา (โผล่แค่ 1-2 อัน) */}
-    <span className="flex items-center gap-1 shrink-0">
-      {(t.tags ?? []).slice(0, 2).map(tag => <TagChip key={tag} label={tag} />)}
-    </span>
-  </button>
-))}
+                        {/* แท็กเล็ก ๆ ห้อยด้านขวา (โผล่แค่ 1-2 อัน) */}
+                        <span className="flex items-center gap-1 shrink-0">
+                          {(t.tags ?? []).slice(0, 2).map(tag => <TagChip key={tag} label={tag} />)}
+                        </span>
+                      </button>
+                    ))}
                     {dayTasks.length > 4 && (<div className="text-[11px] text-gray-500">+{dayTasks.length - 4} more…</div>)}
                   </div>
                 </div>
@@ -890,56 +921,56 @@ export default function LiffAdminPage() {
             แสดงงานตาม <b>due date</b> (เวลาไทย). งานที่ไม่มี due date จะไม่แสดงในปฏิทิน
           </div>
         </div>
+
         {/* ===== Task Detail Modal ===== */}
-{selectedTask && (
-  <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center px-4"
-       onClick={() => setSelectedTask(null)}>
-    <div
-      className="w-full max-w-lg rounded-2xl bg-white shadow-lg border border-slate-200 p-4 md:p-5"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <h3 className="text-base md:text-lg font-semibold text-slate-900 leading-snug">
-          {selectedTask.title}
-        </h3>
-        <button
-          className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
-          onClick={() => setSelectedTask(null)}
-        >
-          ปิด
-        </button>
-      </div>
+        {selectedTask && (
+          <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center px-4"
+               onClick={() => setSelectedTask(null)}>
+            <div
+              className="w-full max-w-lg rounded-2xl bg-white shadow-lg border border-slate-200 p-4 md:p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="text-base md:text-lg font-semibold text-slate-900 leading-snug">
+                  {selectedTask.title}
+                </h3>
+                <button
+                  className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  onClick={() => setSelectedTask(null)}
+                >
+                  ปิด
+                </button>
+              </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        {(selectedTask.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
-      </div>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {(selectedTask.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
+              </div>
 
-      <dl className="space-y-2 text-sm text-slate-700 mb-3">
-        <div className="flex">
-          <dt className="w-24 shrink-0 text-slate-500">กำหนดส่ง</dt>
-          <dd>{fmtDate(selectedTask.due_at)}</dd>
-        </div>
-        <div className="flex">
-          <dt className="w-24 shrink-0 text-slate-500">สถานะ</dt>
-          <dd>{selectedTask.status}</dd>
-        </div>
-        <div className="flex">
-          <dt className="w-24 shrink-0 text-slate-500">ความสำคัญ</dt>
-          <dd>{selectedTask.priority}</dd>
-        </div>
-      </dl>
+              <dl className="space-y-2 text-sm text-slate-700 mb-3">
+                <div className="flex">
+                  <dt className="w-24 shrink-0 text-slate-500">กำหนดส่ง</dt>
+                  <dd>{fmtDate(selectedTask.due_at)}</dd>
+                </div>
+                <div className="flex">
+                  <dt className="w-24 shrink-0 text-slate-500">สถานะ</dt>
+                  <dd>{selectedTask.status}</dd>
+                </div>
+                <div className="flex">
+                  <dt className="w-24 shrink-0 text-slate-500">ความสำคัญ</dt>
+                  <dd>{selectedTask.priority}</dd>
+                </div>
+              </dl>
 
-      {selectedTask.description && (
-        <div className="text-sm text-slate-800 whitespace-pre-wrap border-t pt-3">
-          {selectedTask.description}
-        </div>
-      )}
-    </div>
-  </div>
-)}
+              {selectedTask.description && (
+                <div className="text-sm text-slate-800 whitespace-pre-wrap border-t pt-3">
+                  {selectedTask.description}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       </main>
-      
     </div>
   );
 }
