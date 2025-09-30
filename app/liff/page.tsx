@@ -41,23 +41,32 @@ const fmtDate = (iso: string | null) =>
 // Toast แบบง่าย
 type Toast = { type: "ok" | "err"; text: string } | null;
 
-// สีให้เด่นขึ้น (พื้นเข้ม + ตัวอักษรขาว)
+// สีให้เด่นขึ้น (พื้นเข้ม ตัวหนังสือขาว)
 const TAG_COLORS: Record<string, string> = {
-  CAL1: "bg-green-500 text-white border-green-600",
-  CAL2: "bg-purple-500 text-white border-purple-600",
+  CAL1: "bg-emerald-600 text-white border-emerald-700",
+  CAL2: "bg-violet-600 text-white border-violet-700",
 };
 
-
-// 🏷️ ปรับ label ให้ human-readable: CAL1 → กพส, CAL2 → กบม.
+// ป้ายชื่อที่ต้องการแสดง (CAL1 → กพส, CAL2 → กบม.)
 const TAG_LABELS: Record<string, string> = {
   CAL1: "กพส",
   CAL2: "กบม.",
 };
 
-// ป้ายแท็กปกติ (ในตาราง/การ์ด)
+// ทำให้ค่า tag เข้าสู่คีย์มาตรฐาน เพื่อใช้เลือกสี (รับได้ทั้ง CAL1/CAL2/กพส/กบม.)
+function toCanonTag(label: string): string {
+  const raw = (label || "").trim();
+  const lower = raw.toLowerCase();
+  if (["cal1", "กพส", "ก.พ.ส", "kps"].includes(lower)) return "CAL1";
+  if (["cal2", "กบม.", "กบม", "kbm"].includes(lower)) return "CAL2";
+  return raw; // ถ้าไม่รู้จัก ก็คืนค่าเดิม
+}
+
+// ป้ายแท็กปกติ (ตาราง/การ์ด)
 const TagBadge: React.FC<{ label: string }> = ({ label }) => {
-  const cls = TAG_COLORS[label] || "bg-gray-200 text-gray-700 border-gray-300";
-  const showLabel = TAG_LABELS[label] || label; // CAL1 -> กพส, CAL2 -> กบม.
+  const key = toCanonTag(label);
+  const cls = TAG_COLORS[key] || "bg-gray-200 text-gray-700 border-gray-300";
+  const showLabel = TAG_LABELS[key] || label;
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-sm ${cls}`}>
       {showLabel}
@@ -65,10 +74,11 @@ const TagBadge: React.FC<{ label: string }> = ({ label }) => {
   );
 };
 
-// ป้ายแท็กขนาดเล็ก (ในปฏิทิน)
+// ป้ายแท็กเล็ก (ในปฏิทิน)
 const TagChip: React.FC<{ label: string }> = ({ label }) => {
-  const cls = TAG_COLORS[label] || "bg-gray-200 text-gray-700 border-gray-300";
-  const showLabel = TAG_LABELS[label] || label;
+  const key = toCanonTag(label);
+  const cls = TAG_COLORS[key] || "bg-gray-200 text-gray-700 border-gray-300";
+  const showLabel = TAG_LABELS[key] || label;
   return (
     <span className={`inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold border shadow-sm ${cls}`}>
       {showLabel}
