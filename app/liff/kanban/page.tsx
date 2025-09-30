@@ -776,20 +776,16 @@ export default function KanbanPage() {
                 </div>
               </div>
               
-<div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-  <button onClick={closeEditor} className={btn("ghost")}>
-    ปิด
-  </button>
-  <button onClick={saveProgress} className={btn("primary")}>
-    บันทึกความคืบหน้า
-  </button>
-  <button onClick={markDone} className={btn("danger")}>
-    ปิดงาน (100% & Done)
-  </button>
-  <button onClick={addToCalendarServer} className={btn("primary")}>
-    เพิ่มใน Google Calendar
-  </button>
+{/* แทนที่ block ปุ่มเดิม */}
+<div className="mt-4 overflow-x-auto">
+  <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
+    <button onClick={closeEditor} className={btn("ghost")}>ปิด</button>
+    <button onClick={saveProgress} className={btn("primary")}>บันทึกความคืบหน้า</button>
+    <button onClick={markDone} className={btn("danger")}>ปิดงาน (100% & Done)</button>
+    <button onClick={addToCalendarServer} className={btn("primary")}>เพิ่มใน Google Calendar</button>
+  </div>
 </div>
+
 
               <div className="mt-2 text-[11px] text-slate-500">
                 * ระบบจะเปิดหน้า Google Calendar พร้อมกรอกข้อมูลให้ และเชิญอีเมลที่ระบุเป็นผู้เข้าร่วม
