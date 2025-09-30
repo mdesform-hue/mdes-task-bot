@@ -900,10 +900,10 @@ export default function LiffAdminPage() {
                                    bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-2 font-medium"
                       >
                         {/* จุดสีเล็ก ๆ สื่อสถานะ (optional) */}
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
 
                         {/* ชื่อเรื่อง (truncate) */}
-                        <span className="truncate flex-1">{t.title}</span>
+                       <span className="truncate flex-1">{t.title}</span>
 
                         {/* แท็กเล็ก ๆ ห้อยด้านขวา (โผล่แค่ 1-2 อัน) */}
                         <span className="flex items-center gap-1 shrink-0">
