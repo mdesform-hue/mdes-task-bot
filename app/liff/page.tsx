@@ -493,7 +493,8 @@ export default function LiffAdminPage() {
               </button>
             </div>
           </div>
-          {/* ===== Bulk actions bar (show when any rows selected) ===== */}
+        </div>
+   {/* ===== Bulk actions bar (show when any rows selected) ===== */}
 {selected.size > 0 && (
   <div className="sticky top-14 z-40 mb-4 rounded-lg border bg-amber-50 text-slate-800 px-3 py-2">
     <div className="flex flex-wrap items-center gap-2">
@@ -554,8 +555,6 @@ export default function LiffAdminPage() {
     </div>
   </div>
 )}
-        </div>
-
         {/* ===== Create row ===== */}
         <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
           <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
