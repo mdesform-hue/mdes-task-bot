@@ -777,11 +777,9 @@ export default function KanbanPage() {
               </div>
               
 {/* แทนที่ block ปุ่มเดิม */}
-<div className="mt-4 overflow-x-auto">
+<div className="mt-2 overflow-x-auto">
   <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
-    <button onClick={closeEditor} className={btn("ghost")}>ปิด</button>
     <button onClick={saveProgress} className={btn("primary")}>บันทึกความคืบหน้า</button>
-    <button onClick={markDone} className={btn("danger")}>ปิดงาน (100% & Done)</button>
     <button onClick={addToCalendarServer} className={btn("primary")}>เพิ่มใน Google Calendar</button>
   </div>
 </div>
