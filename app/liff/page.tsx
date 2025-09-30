@@ -205,23 +205,34 @@ export default function LiffAdminPage() {
   }
 
   async function syncNow() {
-    if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
-    try {
-      setCfgLoading(true);
-      const r = await fetch(`/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`, {
-        method: "POST",
-      });
-      const txt = await r.text();
-      if (!r.ok) throw new Error(txt);
-      alert(txt || "ซิงค์เสร็จแล้ว");
-      await load(); // reload tasks after sync
-    } catch (e: any) {
-      alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
-    } finally {
-      setCfgLoading(false);
-    }
-  }
+  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+  try {
+    setCfgLoading(true);
 
+    // 1) Sync จาก Google → external_calendar_events (กรองสีที่ฝั่ง backend แล้ว)
+    const r1 = await fetch(
+      `/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`,
+      { method: "POST" }
+    );
+    const t1 = await r1.text();
+    if (!r1.ok) throw new Error(t1 || "calendar-sync failed");
+
+    // 2) Import จาก mirror → tasks (เอาเฉพาะ Flamingo = 4)
+    const r2 = await fetch(
+      `/api/admin/calendar-import?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}&colorId=4`,
+      { method: "POST" }
+    );
+    const t2 = await r2.text();
+    if (!r2.ok) throw new Error(t2 || "calendar-import failed");
+
+    alert(`Sync OK\n\n${t1}\n\nImport OK\n${t2}`);
+    await load(); // reload tasks after import
+  } catch (e: any) {
+    alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
+  } finally {
+    setCfgLoading(false);
+  }
+}
   const saveRow = async (id: string, extra?: Partial<Task>) => {
     const body = { ...(draft[id] || {}), ...(extra || {}) };
     if (!Object.keys(body).length) return;
