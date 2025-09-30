@@ -297,14 +297,34 @@ export default function KanbanPage() {
     const raw = e.dataTransfer.getData("text/plain");
     const id = raw || draggingId;
     if (!id) return;
+
+    // หา task ปัจจุบันเพื่อดู progress เดิม
+    const current = data.find((t) => t.id === id);
+    if (!current) return;
+
+    // ถ้าเป้าเป็น done ให้ตั้ง progress = 100, ถ้าไม่ใช่ ให้คง progress เดิม
+    const newProgress = next === "done" ? 100 : current.progress ?? 0;
+
     try {
-      setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: next } : t)));
+      // Optimistic UI
+      setData((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, status: next, progress: newProgress } : t
+        )
+      );
+
+      // PATCH รวม status + progress (กรณี done)
+      const body: Partial<Pick<Task, "status" | "progress">> =
+        next === "done"
+          ? { status: next, progress: 100 }
+          : { status: next };
+
       const r = await fetch(
         `/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: next }),
+          body: JSON.stringify(body),
         }
       );
       if (!r.ok) throw new Error(await r.text());
