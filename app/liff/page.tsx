@@ -41,6 +41,21 @@ const fmtDate = (iso: string | null) =>
 // Toast แบบง่าย
 type Toast = { type: "ok" | "err"; text: string } | null;
 
+// 🎨 สีของ badge ต่อ tag
+const TAG_COLORS: Record<string, string> = {
+  CAL1: "bg-green-100 text-green-700 border-green-200",
+  CAL2: "bg-purple-100 text-purple-700 border-purple-200",
+};
+// render badge ช่วยให้ reuse ได้
+const TagBadge: React.FC<{ label: string }> = ({ label }) => {
+  const cls = TAG_COLORS[label] || "bg-gray-100 text-gray-700 border-gray-200";
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+      {label}
+    </span>
+  );
+};
+
 export default function LiffAdminPage() {
   // state สำหรับ calendar config (—> ย้ายไว้ที่เดียว ไม่ซ้ำซ้อน)
   const [cal1Id, setCal1Id] = useState("");
@@ -205,34 +220,35 @@ export default function LiffAdminPage() {
   }
 
   async function syncNow() {
-  if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
-  try {
-    setCfgLoading(true);
+    if (!groupId || !adminKey) return alert("กรอก Group ID / Admin Key ก่อน");
+    try {
+      setCfgLoading(true);
 
-    // 1) Sync จาก Google → external_calendar_events (กรองสีที่ฝั่ง backend แล้ว)
-    const r1 = await fetch(
-      `/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`,
-      { method: "POST" }
-    );
-    const t1 = await r1.text();
-    if (!r1.ok) throw new Error(t1 || "calendar-sync failed");
+      // 1) Sync จาก Google → external_calendar_events (กรองสีที่ฝั่ง backend แล้ว)
+      const r1 = await fetch(
+        `/api/admin/calendar-sync?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}`,
+        { method: "POST" }
+      );
+      const t1 = await r1.text();
+      if (!r1.ok) throw new Error(t1 || "calendar-sync failed");
 
-    // 2) Import จาก mirror → tasks (เอาเฉพาะ Flamingo = 4)
-    const r2 = await fetch(
-      `/api/admin/calendar-import?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}&colorId=4`,
-      { method: "POST" }
-    );
-    const t2 = await r2.text();
-    if (!r2.ok) throw new Error(t2 || "calendar-import failed");
+      // 2) Import จาก mirror → tasks (เอาเฉพาะ Flamingo = 4)
+      const r2 = await fetch(
+        `/api/admin/calendar-import?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}&colorId=4`,
+        { method: "POST" }
+      );
+      const t2 = await r2.text();
+      if (!r2.ok) throw new Error(t2 || "calendar-import failed");
 
-    alert(`Sync OK\n\n${t1}\n\nImport OK\n${t2}`);
-    await load(); // reload tasks after import
-  } catch (e: any) {
-    alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
-  } finally {
-    setCfgLoading(false);
+      alert(`Sync OK\n\n${t1}\n\nImport OK\n${t2}`);
+      await load(); // reload tasks after import
+    } catch (e: any) {
+      alert(`ซิงค์ไม่สำเร็จ: ${e.message || e}`);
+    } finally {
+      setCfgLoading(false);
+    }
   }
-}
+
   const saveRow = async (id: string, extra?: Partial<Task>) => {
     const body = { ...(draft[id] || {}), ...(extra || {}) };
     if (!Object.keys(body).length) return;
@@ -498,34 +514,14 @@ export default function LiffAdminPage() {
 
             return (
               <div key={t.id} className="rounded-2xl border shadow-sm p-3">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
                     <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{t.code}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
-                      disabled={isSaving}
-                      onClick={() => {
-                        setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x) : x));
-                        saveRow(t.id);
-                      }}
-                    >
-                      {isSaving ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      className="px-3 py-2 rounded bg-green-700 text-white disabled:opacity-60"
-                      disabled={isSaving}
-                      onClick={() => {
-                        change(t.id, { status: "done", progress: 100 });
-                        setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x, { status: "done", progress: 100 }) : x));
-                        saveRow(t.id, { status: "done", progress: 100 });
-                      }}
-                    >
-                      {isSaving ? "Saving…" : "Done"}
-                    </button>
-                    <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={()=>delRow(t.id)}>Del</button>
+                  {/* ✅ แสดง badge tag ด้านขวา */}
+                  <div className="flex flex-wrap gap-1">
+                    {(cur.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
                   </div>
                 </div>
 
@@ -649,6 +645,11 @@ export default function LiffAdminPage() {
                     </td>
 
                     <td className="p-2">
+                      {/* ✅ แสดง badge ของทุกแท็ก */}
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {(cur.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
+                      </div>
+                      {/* ช่องแก้ไขแท็กตามเดิม */}
                       <input className="border px-2 py-2 w-full rounded"
                              value={tagsToStr(cur.tags)}
                              onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
