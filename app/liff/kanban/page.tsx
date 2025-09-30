@@ -382,6 +382,32 @@ export default function KanbanPage() {
     }
   }
 
+  /** ===== Mark Done (Close Progress) ===== */
+  async function markDone() {
+    if (!editTask) return;
+    const id = editTask.id;
+    try {
+      // optimistic UI: done + 100%
+      setData((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: "done", progress: 100 } : t))
+      );
+      const r = await fetch(
+        `/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "done", progress: 100 }),
+        }
+      );
+      if (!r.ok) throw new Error(await r.text());
+      closeEditor();
+    } catch (e) {
+      console.error(e);
+      alert("ปิดงานไม่สำเร็จ");
+      load();
+    }
+  }
+
   /** ===== Add to Calendar (server) ===== */
   async function addToCalendarServer() {
     const t = editTask;
@@ -397,7 +423,7 @@ export default function KanbanPage() {
       date: calDate, // "YYYY-MM-DD"
       start: calStart, // "HH:mm"
       end: calEnd, // "HH:mm"
-      attendeeEmail: calEmail || undefined,
+      attendeeEmail: (calEmail || undefined) as string | undefined,
     };
     try {
       const r = await fetch("/api/calendar/create", {
@@ -762,12 +788,16 @@ export default function KanbanPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-end gap-2">
+            {/* Footer actions */}
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
               <button onClick={closeEditor} className={btn("ghost")}>
                 ปิด
               </button>
               <button onClick={saveProgress} className={btn("primary")}>
                 บันทึกความคืบหน้า
+              </button>
+              <button onClick={markDone} className={btn("danger")}>
+                ปิดงาน (100% & Done)
               </button>
             </div>
           </div>
