@@ -41,11 +41,12 @@ const fmtDate = (iso: string | null) =>
 // Toast แบบง่าย
 type Toast = { type: "ok" | "err"; text: string } | null;
 
-// 🎨 สีของ badge ต่อ tag
+// สีให้เด่นขึ้น (พื้นเข้ม + ตัวอักษรขาว)
 const TAG_COLORS: Record<string, string> = {
-  CAL1: "bg-green-100 text-green-700 border-green-200",
-  CAL2: "bg-purple-100 text-purple-700 border-purple-200",
+  CAL1: "bg-green-500 text-white border-green-600",
+  CAL2: "bg-purple-500 text-white border-purple-600",
 };
+
 
 // 🏷️ ปรับ label ให้ human-readable: CAL1 → กพส, CAL2 → กบม.
 const TAG_LABELS: Record<string, string> = {
@@ -53,23 +54,23 @@ const TAG_LABELS: Record<string, string> = {
   CAL2: "กบม.",
 };
 
-// render badge ช่วยให้ reuse ได้
+// ป้ายแท็กปกติ (ในตาราง/การ์ด)
 const TagBadge: React.FC<{ label: string }> = ({ label }) => {
-  const cls = TAG_COLORS[label] || "bg-gray-100 text-gray-700 border-gray-200";
-  const showLabel = TAG_LABELS[label] || label;
+  const cls = TAG_COLORS[label] || "bg-gray-200 text-gray-700 border-gray-300";
+  const showLabel = TAG_LABELS[label] || label; // CAL1 -> กพส, CAL2 -> กบม.
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-sm ${cls}`}>
       {showLabel}
     </span>
   );
 };
 
-// badge เล็กสำหรับแสดงในปฏิทิน
+// ป้ายแท็กขนาดเล็ก (ในปฏิทิน)
 const TagChip: React.FC<{ label: string }> = ({ label }) => {
-  const cls = TAG_COLORS[label] || "bg-gray-100 text-gray-700 border-gray-200";
+  const cls = TAG_COLORS[label] || "bg-gray-200 text-gray-700 border-gray-300";
   const showLabel = TAG_LABELS[label] || label;
   return (
-    <span className={`inline-flex items-center px-1.5 py-[2px] rounded-full text-[10px] font-medium border ${cls}`}>
+    <span className={`inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold border shadow-sm ${cls}`}>
       {showLabel}
     </span>
   );
@@ -895,8 +896,8 @@ export default function LiffAdminPage() {
                       <button
                         key={t.id}
                         onClick={() => setSelectedTask(t)}
-                        className="w-full text-left text-[11px] md:text-xs px-1.5 py-1 rounded border hover:shadow-sm
-                                   bg-white/70 hover:bg-white border-slate-200 flex items-center gap-1"
+                        className="w-full text-left text-[13px] md:text-sm px-2 py-1.5 rounded border hover:shadow
+                                   bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-2 font-medium"
                       >
                         {/* จุดสีเล็ก ๆ สื่อสถานะ (optional) */}
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
