@@ -49,13 +49,13 @@ function thDate(iso?: string | null) {
 }
 function startOfDay(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
-const COLORS = ["#22c55e", "#0ea5e9", "#ef4444", "#16a34a", "#94a3b8"];
+
 const STATUS_COLOR: Record<Status, string> = {
-  todo: "#3b82f6",       
-  in_progress: "#f59e0b", 
-  blocked: "#ef4444",     
-  done: "#22c55e",        
-  cancelled: "#9ca3af",   
+  todo: "#3b82f6",
+  in_progress: "#f59e0b",
+  blocked: "#ef4444",
+  done: "#22c55e",
+  cancelled: "#9ca3af",
 };
 
 const PRIORITY_LABEL: Record<Priority, string> = {
@@ -64,12 +64,11 @@ const PRIORITY_LABEL: Record<Priority, string> = {
   medium: "ปานกลาง",
   low: "ต่ำ",
 };
-
 const PRIORITY_COLOR: Record<Priority, string> = {
-  urgent: "#ef4444", // แดง
-  high:   "#f97316", // เหลืองส้ม
-  medium: "#eab308", // ฟ้า
-  low:    "#22c55e", // เขียว
+  urgent: "#ef4444",
+  high:   "#f97316",
+  medium: "#eab308",
+  low:    "#22c55e",
 };
 
 export default function LiffDashboardPage() {
@@ -120,19 +119,23 @@ export default function LiffDashboardPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [groupId, adminKey]);
 
+  // -------- กรองตามเดือน (สำหรับกราฟ/KPI รายเดือน) --------
   const monthFiltered = useMemo(() => {
     if (!month) return items;
     const [yy, mm] = month.split("-").map(Number);
     return items.filter(t => {
-      if (!t.due_at) return true; // ไม่มี due ก็ยังแสดง
+      if (!t.due_at) return true; // ไม่มี due ก็ยังแสดงในสรุป
       const d = new Date(t.due_at);
       return d.getFullYear() === yy && d.getMonth() === (mm - 1);
     });
   }, [items, month]);
 
+  // -------- KPI รายเดือน (อ้างอิง monthFiltered) + ตัวเลขรวม (all) --------
   const kpi = useMemo(() => {
     const arr = monthFiltered;
-    const total = arr.length;
+    const totalMonth = arr.length;
+    const totalAll = items.length;
+
     const done = arr.filter(t => t.status === "done").length;
     const inProgress = arr.filter(t => t.status === "in_progress").length;
     const blocked = arr.filter(t => t.status === "blocked").length;
@@ -145,7 +148,7 @@ export default function LiffDashboardPage() {
       return d >= today && d < addDays(today, 7);
     }).length;
 
-    const avgProgress = total ? Math.round(arr.reduce((s, t) => s + Number(t.progress || 0), 0) / total) : 0;
+    const avgProgress = totalMonth ? Math.round(arr.reduce((s, t) => s + Number(t.progress || 0), 0) / totalMonth) : 0;
 
     const byStatus: Record<Status, number> = { todo:0, in_progress:0, blocked:0, done:0, cancelled:0 };
     arr.forEach(t => { byStatus[t.status]++; });
@@ -153,39 +156,45 @@ export default function LiffDashboardPage() {
     const byPriority: Record<Priority, number> = { urgent:0, high:0, medium:0, low:0 };
     arr.forEach(t => { byPriority[t.priority]++; });
 
-    const late = arr
-      .filter(t => t.due_at && new Date(t.due_at) < today && t.status !== "done" && t.status !== "cancelled")
-      .map(t => ({ ...t, lateDays: Math.ceil((+today - +startOfDay(new Date(t.due_at!))) / 86400000) }))
-      .sort((a,b) => b.lateDays - a.lateDays)
-      .slice(0, 10);
-
     const near3 = arr
       .filter(t => t.due_at && new Date(t.due_at) >= today && new Date(t.due_at) < addDays(today, 3) && t.status !== "done")
       .sort((a,b) => +new Date(a.due_at!) - +new Date(b.due_at!))
       .slice(0, 10);
 
-    return { total, done, inProgress, blocked, avgProgress, overdue, upcoming7, byStatus, byPriority, late, near3 };
-  }, [monthFiltered]);
+    // รายการที่ยังไม่ได้ตั้ง due date (ใช้ทั้งหมด ไม่จำกัดเดือน)
+    const noDueTop = items
+      .filter(t => !t.due_at)
+      .sort((a,b) => +new Date(b.updated_at) - +new Date(a.updated_at))
+      .slice(0, 10);
 
-  // ======== Data สำหรับกราฟ ========
-const statusPieData = useMemo(
-  () => STATUS_ORDER.map((s) => ({
-    key: s, // เก็บค่า status ไว้
-    name: STATUS_LABEL[s],
-    value: kpi.byStatus[s],
-  })),
-  [kpi.byStatus]
-);
-const priorityBarData = useMemo(
-  () =>
-    PR_ORDER.map((p) => ({
-      key: p,                               // เก็บ priority เดิมไว้
-      name: PRIORITY_LABEL[p],              // แสดงชื่อไทย
-      จำนวน: kpi.byPriority[p],
+    return {
+      totalAll, totalMonth,
+      done, inProgress, blocked, avgProgress, overdue, upcoming7,
+      byStatus, byPriority,
+      near3, noDueTop
+    };
+  }, [monthFiltered, items]);
+
+  // ======== Data สำหรับกราฟ (อิงเดือนที่เลือก) ========
+  const statusPieData = useMemo(
+    () => STATUS_ORDER.map((s) => ({
+      key: s,
+      name: STATUS_LABEL[s],
+      value: kpi.byStatus[s],
     })),
-  [kpi.byPriority]
-);
-  // กราฟแนวโน้มงานตามวัน (จำนวนงานที่มี due/วัน ในเดือนที่เลือก)
+    [kpi.byStatus]
+  );
+  const priorityBarData = useMemo(
+    () =>
+      PR_ORDER.map((p) => ({
+        key: p,
+        name: PRIORITY_LABEL[p],
+        จำนวน: kpi.byPriority[p],
+      })),
+    [kpi.byPriority]
+  );
+
+  // แนวโน้มงานตามวัน (จำนวนงานที่มี due/วัน ในเดือนที่เลือก)
   const trendData = useMemo(() => {
     const map = new Map<string, number>();
     monthFiltered.forEach(t => {
@@ -242,29 +251,33 @@ const priorityBarData = useMemo(
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-3 md:gap-4 mb-6">
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="text-sm text-slate-600">งานทั้งหมด</div>
-            <div className="text-2xl font-semibold">{kpi.total}</div>
+            <div className="text-sm text-slate-600">งานทั้งหมด (ทุกช่วงเวลา)</div>
+            <div className="text-2xl font-semibold">{kpi.totalAll}</div>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="text-sm text-slate-600">เสร็จสิ้น</div>
+            <div className="text-sm text-slate-600">งานเดือนนี้ (อิง due)</div>
+            <div className="text-2xl font-semibold">{kpi.totalMonth}</div>
+          </div>
+          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="text-sm text-slate-600">เสร็จสิ้น (เดือนนี้)</div>
             <div className="text-2xl font-semibold text-emerald-700">{kpi.done}</div>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="text-sm text-slate-600">กำลังทำ</div>
+            <div className="text-sm text-slate-600">กำลังทำ (เดือนนี้)</div>
             <div className="text-2xl font-semibold">{kpi.inProgress}</div>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="text-sm text-slate-600">ติดบล็อก</div>
+            <div className="text-sm text-slate-600">ติดบล็อก (เดือนนี้)</div>
             <div className="text-2xl font-semibold text-rose-600">{kpi.blocked}</div>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="text-sm text-slate-600">เลยกำหนด</div>
+            <div className="text-sm text-slate-600">เลยกำหนด (เดือนนี้)</div>
             <div className="text-2xl font-semibold text-red-600">{kpi.overdue}</div>
           </div>
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="text-sm text-slate-600">เฉลี่ยความคืบหน้า</div>
+            <div className="text-sm text-slate-600">เฉลี่ยความคืบหน้า (เดือนนี้)</div>
             <div className="text-2xl font-semibold">{kpi.avgProgress}%</div>
           </div>
         </div>
@@ -273,14 +286,14 @@ const priorityBarData = useMemo(
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           {/* Pie: สถานะ */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">สัดส่วนตามสถานะ</div>
+            <div className="mb-3 font-semibold text-slate-800">สัดส่วนตามสถานะ (เดือนนี้)</div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-               <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={90} label>
-  {statusPieData.map((e, i) => (
-    <Cell key={i} fill={STATUS_COLOR[e.key as Status]} />
-  ))}
+                  <Pie data={statusPieData} dataKey="value" nameKey="name" outerRadius={90} label>
+                    {statusPieData.map((e, i) => (
+                      <Cell key={i} fill={STATUS_COLOR[e.key as Status]} />
+                    ))}
                   </Pie>
                   <Tooltip />
                   <Legend />
@@ -291,27 +304,27 @@ const priorityBarData = useMemo(
 
           {/* Bar: ความสำคัญ */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">จำนวนงานตามความสำคัญ</div>
+            <div className="mb-3 font-semibold text-slate-800">จำนวนงานตามความสำคัญ (เดือนนี้)</div>
             <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={priorityBarData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis allowDecimals={false} />
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={priorityBarData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Bar dataKey="จำนวน">
-                        {priorityBarData.map((e, i) => (
-        <Cell key={i} fill={PRIORITY_COLOR[e.key as Priority]} />
-      ))}
-    </Bar>
-  </BarChart>
-</ResponsiveContainer>
+                    {priorityBarData.map((e, i) => (
+                      <Cell key={i} fill={PRIORITY_COLOR[e.key as Priority]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
           {/* Line: แนวโน้มงานตามวัน */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">แนวโน้มจำนวนงาน (ตาม due date รายวัน)</div>
+            <div className="mb-3 font-semibold text-slate-800">แนวโน้มจำนวนงาน (ตาม due รายวันของเดือนนี้)</div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData}>
@@ -328,8 +341,9 @@ const priorityBarData = useMemo(
 
         {/* Lists */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* ใกล้ครบกำหนด */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">ใกล้ครบกำหนด (3 วัน)</div>
+            <div className="mb-3 font-semibold text-slate-800">ใกล้ครบกำหนด (3 วัน, เดือนนี้)</div>
             {kpi.near3.length === 0 ? (
               <div className="text-sm text-slate-500">ไม่มีรายการ</div>
             ) : (
@@ -347,19 +361,20 @@ const priorityBarData = useMemo(
             )}
           </div>
 
+          {/* แทน “เลยกำหนดมากสุด” -> งานที่ยังไม่มี Due Date (จากทุกช่วงเวลา) */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="mb-3 font-semibold text-slate-800">เลยกำหนดมากสุด</div>
-            {kpi.late.length === 0 ? (
+            <div className="mb-3 font-semibold text-slate-800">งานที่ยังไม่ได้ตั้ง Due Date (ล่าสุด)</div>
+            {kpi.noDueTop.length === 0 ? (
               <div className="text-sm text-slate-500">ไม่มีรายการ</div>
             ) : (
               <ul className="space-y-2">
-                {kpi.late.map(t => (
+                {kpi.noDueTop.map(t => (
                   <li key={t.id} className="flex items-start justify-between gap-3 border-b last:border-0 pb-2">
                     <div className="min-w-0">
                       <div className="font-medium text-slate-800 truncate">{t.title}</div>
-                      <div className="text-xs text-slate-600">code {t.code} • due {thDate(t.due_at)} • {t.priority}</div>
+                      <div className="text-xs text-slate-600">code {t.code} • updated {thDate(t.updated_at)} • {t.priority}</div>
                     </div>
-                    <div className="text-sm text-red-600 whitespace-nowrap">+{(t as any).lateDays} วัน</div>
+                    <div className="text-xs text-slate-500 whitespace-nowrap">{(t.tags ?? []).join(", ")}</div>
                   </li>
                 ))}
               </ul>
@@ -368,7 +383,7 @@ const priorityBarData = useMemo(
         </div>
 
         <div className="mt-6 text-xs text-slate-500">
-          * กรองตามเดือนด้วย <b>due date</b> (รายการที่ไม่มี due จะยังถูกนับรวม)
+          * กราฟ/KPI ส่วนใหญ่คำนวณจาก <b>เดือนที่เลือก</b> โดยอ้างอิง <b>due date</b> (รายการที่ไม่มี due จะยังถูกนับรวมในเดือนนั้น) — กล่อง “งานทั้งหมด” นับทุกงานทั้งหมดเพื่อให้ตรงกับหน้า Tasks
         </div>
       </main>
     </div>
