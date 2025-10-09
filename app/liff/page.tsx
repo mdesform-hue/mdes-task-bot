@@ -5,14 +5,14 @@ import Script from "next/script";
 
 /** ================= Toggle แบบมีแอนิเมชัน (วางไว้ในไฟล์เดียว) ================= */
 function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => void }) {
-  const bgClass = useMemo(() => (isDark ? "bg-slate-900" : "bg-sky-300"), [isDark]);
+  const bgClass = isDark ? "bg-slate-900" : "bg-sky-300";
 
   return (
     <button
       onClick={onToggle}
       aria-label="Toggle dark mode"
       className={[
-        "relative h-12 w-[92px] rounded-full border overflow-hidden",
+        "relative h-8 w-16 rounded-full border overflow-hidden", // h-8 (32px) w-16 (64px)
         "transition-colors duration-500 ease-out",
         "border-slate-300 dark:border-slate-600",
         bgClass,
@@ -27,140 +27,78 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
 
       {/* พื้นหลังกลางคืน */}
       <div className={["absolute inset-0 bg-slate-900 transition-opacity duration-500", isDark ? "opacity-100" : "opacity-0"].join(" ")}>
-        {Array.from({ length: 16 }).map((_, i) => (
+        {Array.from({ length: 12 }).map((_, i) => (
           <span key={i} className={`star star-${(i % 8) + 1}`} />
         ))}
       </div>
 
-      {/* ปุ่มวงกลม (ดวงอาทิตย์/ดวงจันทร์) */}
+      {/* ปุ่มวงกลม (ดวงอาทิตย์/จันทร์) */}
       <div
         className={[
-          "absolute top-1 left-1 h-10 w-10 rounded-full",
+          "absolute top-1 left-1 h-6 w-6 rounded-full", // h-6 w-6 = 24px
           "transition-transform duration-500 ease-out",
-          isDark ? "translate-x-[56px]" : "translate-x-0",
+          isDark ? "translate-x-[32px]" : "translate-x-0", // 64 - 24 - 8 = 32px
           "bg-yellow-300 dark:bg-slate-100 shadow-md",
           "flex items-center justify-center",
         ].join(" ")}
       >
-        {/* Sun */}
-        <svg className={["h-6 w-6 transition-opacity duration-300", isDark ? "opacity-0" : "opacity-100"].join(" ")} viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="5" className="fill-yellow-400" />
-          <g className="stroke-yellow-400" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M12 1.5v3" />
-            <path d="M12 19.5v3" />
-            <path d="M1.5 12h3" />
-            <path d="M19.5 12h3" />
-            <path d="M4.2 4.2l2.1 2.1" />
-            <path d="M17.7 17.7l2.1 2.1" />
-            <path d="M19.8 4.2l-2.1 2.1" />
-            <path d="M6.3 17.7l-2.1 2.1" />
+        {/* Sun (ย่อเป็น 20px) */}
+        <svg className={["h-5 w-5 transition-opacity duration-300", isDark ? "opacity-0" : "opacity-100"].join(" ")} viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4.2" className="fill-yellow-400" />
+          <g className="stroke-yellow-400" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M12 2v2.6" /><path d="M12 19.4V22" />
+            <path d="M2 12h2.6" /><path d="M19.4 12H22" />
+            <path d="M4.6 4.6l1.8 1.8" /><path d="M17.6 17.6l1.8 1.8" />
+            <path d="M19.4 4.6l-1.8 1.8" /><path d="M6.4 17.6l-1.8 1.8" />
           </g>
         </svg>
 
-        {/* Moon */}
-        <svg className={["absolute h-6 w-6 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
+        {/* Moon (ย่อเป็น 20px) */}
+        <svg className={["absolute h-5 w-5 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
           <path d="M16.5 12.5a7 7 0 1 1-5-9.5 6 6 0 1 0 7.7 7.7 7.1 7.1 0 0 1-2.7 1.8z" className="fill-slate-300" />
-          <circle cx="10" cy="9" r="1" className="fill-slate-400" />
-          <circle cx="12.5" cy="13" r="0.8" className="fill-slate-400" />
-          <circle cx="8.5" cy="13.5" r="0.6" className="fill-slate-400" />
+          <circle cx="10" cy="9" r="0.9" className="fill-slate-400" />
+          <circle cx="12.2" cy="12.8" r="0.7" className="fill-slate-400" />
         </svg>
       </div>
 
-      {/* style เฉพาะ toggle */}
+      {/* ปรับสเกลเมฆ/ดาวให้เข้ากับขนาดใหม่ */}
       <style jsx>{`
         .cloud {
           position: absolute;
-          top: 18px;
-          height: 8px;
-          width: 28px;
+          top: 12px;
+          height: 6px;
+          width: 22px;
           background: #fff;
           border-radius: 999px;
-          box-shadow: 14px -6px 0 2px #fff, 28px -2px 0 0 #fff;
+          box-shadow: 11px -5px 0 2px #fff, 22px -2px 0 0 #fff;
           opacity: 0.85;
           animation: cloud-move 10s linear infinite;
         }
-        .cloud-1 {
-          left: -20px;
-          animation-delay: 0s;
-        }
-        .cloud-2 {
-          left: -40px;
-          top: 8px;
-          transform: scale(0.8);
-          animation-delay: 2.5s;
-        }
-        @keyframes cloud-move {
-          0% {
-            transform: translateX(0) scale(var(--scale, 1));
-          }
-          100% {
-            transform: translateX(130px) scale(var(--scale, 1));
-          }
-        }
+        .cloud-1 { left: -16px; animation-delay: 0s; }
+        .cloud-2 { left: -32px; top: 6px; transform: scale(0.8); animation-delay: 2s; }
+        @keyframes cloud-move { 0% { transform: translateX(0); } 100% { transform: translateX(95px); } }
+
         .star {
           position: absolute;
-          width: 2px;
-          height: 2px;
-          background: white;
-          border-radius: 999px;
-          opacity: 0.6;
-          animation: twinkle 1.8s ease-in-out infinite;
+          width: 2px; height: 2px;
+          background: white; border-radius: 999px; opacity: 0.6;
+          animation: twinkle 1.6s ease-in-out infinite;
         }
-        .star-1 {
-          top: 10px;
-          left: 16px;
-          animation-delay: 0s;
-        }
-        .star-2 {
-          top: 6px;
-          left: 46px;
-          animation-delay: 0.3s;
-        }
-        .star-3 {
-          top: 22px;
-          left: 64px;
-          animation-delay: 0.6s;
-        }
-        .star-4 {
-          top: 30px;
-          left: 24px;
-          animation-delay: 0.9s;
-        }
-        .star-5 {
-          top: 14px;
-          left: 74px;
-          animation-delay: 1.2s;
-        }
-        .star-6 {
-          top: 36px;
-          left: 54px;
-          animation-delay: 1.5s;
-        }
-        .star-7 {
-          top: 26px;
-          left: 8px;
-          animation-delay: 1.8s;
-        }
-        .star-8 {
-          top: 38px;
-          left: 78px;
-          animation-delay: 2.1s;
-        }
-        @keyframes twinkle {
-          0%,
-          100% {
-            opacity: 0.2;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.9;
-            transform: scale(1.4);
-          }
-        }
+        .star-1 { top: 6px; left: 12px; animation-delay: 0s; }
+        .star-2 { top: 5px; left: 32px; animation-delay: .2s; }
+        .star-3 { top: 16px; left: 46px; animation-delay: .4s; }
+        .star-4 { top: 22px; left: 18px; animation-delay: .6s; }
+        .star-5 { top: 10px; left: 54px; animation-delay: .8s; }
+        .star-6 { top: 26px; left: 38px; animation-delay: 1.0s; }
+        .star-7 { top: 18px; left: 6px;  animation-delay: 1.2s; }
+        .star-8 { top: 27px; left: 58px; animation-delay: 1.4s; }
+
+        @keyframes twinkle { 0%,100% { opacity: .2; transform: scale(1); } 50% { opacity: .9; transform: scale(1.35); } }
       `}</style>
     </button>
   );
 }
+
 
 /** ================= Types / Consts ================= */
 type Task = {
