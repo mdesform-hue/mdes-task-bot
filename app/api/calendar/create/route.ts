@@ -5,7 +5,7 @@ import { google } from "googleapis";
 
 const TZ = "Asia/Bangkok";
 
-/** สร้าง JWT สำหรับ Service Account; ถ้าต้อง impersonate ให้ใส่ subject */
+/** สร้าง JWT สำหรับ Service Account; ถ้าต้อง impersonate ผู้ใช้ปลายทางให้ใส่ subject */
 function getAuth(subject?: string) {
   const email = process.env.GOOGLE_CLIENT_EMAIL!;
   const key = (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
@@ -30,6 +30,7 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: Request) {
   try {
+    const body = await req.json();
     const {
       title,
       description = "",
@@ -37,35 +38,26 @@ export async function POST(req: Request) {
       date,     // "YYYY-MM-DD"
       start,    // "HH:mm"
       end,      // "HH:mm"
-      attendeeEmail, // ← ต้องกรอกอีเมลที่ต้องการให้ "ลงตาราง"
-      // หมายเหตุ: จะไม่ใช้ GCAL_CALENDAR_ID แล้วในเคสนี้
-    } = await req.json();
+      attendeeEmail, // ← ต้องกรอก: ใช้เป็น calendarId ปลายทาง
+    } = body || {};
 
-    // เช็คช่องบังคับ
+    // ช่องบังคับ
     if (!title || !date || !start || !end) {
       return new Response("bad request: missing title/date/start/end", { status: 400 });
     }
+    const target = String(attendeeEmail || "").trim();
+    if (!target) return new Response("กรุณากรอกอีเมลปฏิทิน (ปลายทาง)", { status: 400 });
+    if (!emailRe.test(target)) return new Response("อีเมลไม่ถูกต้อง", { status: 400 });
 
-    const targetRaw = String(attendeeEmail || "").trim();
-    if (!targetRaw) {
-      return new Response("กรุณากรอกอีเมลปฏิทิน (เชิญเข้าร่วม) ก่อน", { status: 400 });
-    }
-    if (targetRaw.includes(",")) {
-      return new Response("กรุณากรอกอีเมลเดียวเท่านั้น (ห้ามคั่น ,)", { status: 400 });
-    }
-    if (!emailRe.test(targetRaw)) {
-      return new Response("อีเมลไม่ถูกต้อง", { status: 400 });
-    }
+    // ใช้อีเมลที่กรอกเป็น calendarId ปลายทาง
+    const calendarId = target;
 
-    // ── ใช้อีเมลที่กรอกเป็น 'calendarId' ปลายทาง ──
-    const calendarId = targetRaw;
-
-    // ถ้าองค์กรคุณเปิด Domain-wide Delegation และต้องการให้ SA สวมสิทธิ์ user ปลายทาง:
-    // ตั้ง ENV CALENDAR_IMPERSONATE=1 แล้วเราจะใส่ subject = calendarId
+    // ถ้าเป็น Google Workspace และเปิด Domain-wide Delegation:
+    // ตั้ง CALENDAR_IMPERSONATE=1 เพื่อสวมสิทธิ์ user ปลายทางโดยใช้ subject
     const useImpersonation = (process.env.CALENDAR_IMPERSONATE || "").toLowerCase() === "1";
     const auth = getAuth(useImpersonation ? calendarId : undefined);
-
     const calendar = google.calendar({ version: "v3", auth });
+
     const startStr = toRFC3339Local(date, start);
     const endStr = toRFC3339Local(date, end);
 
@@ -77,8 +69,8 @@ export async function POST(req: Request) {
         location,
         start: { dateTime: startStr, timeZone: TZ },
         end:   { dateTime: endStr,   timeZone: TZ },
+        // โหมด B: ไม่ใส่ attendees เพราะเขียนลงปฏิทินของปลายทางโดยตรง
       },
-      // ไม่ส่งอีเมลเชิญ เพราะเราเขียนลงปฏิทินปลายทางโดยตรง
       sendUpdates: "none",
     });
 
@@ -90,10 +82,9 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     console.error("CAL_CREATE_ERR", e?.response?.data || e?.message || e);
-    // ส่งข้อความช่วยไดบั๊กเรื่องสิทธิ์
     if (e?.code === 403 || e?.response?.status === 403) {
       return new Response(
-        "permission_denied: Service Account ยังไม่มีสิทธิ์เขียนในปฏิทินของอีเมลนี้ — ให้แชร์สิทธิ์แก้ไขให้ SA หรือเปิด Domain-wide Delegation แล้วตั้ง CALENDAR_IMPERSONATE=1",
+        "permission_denied: Service Account ยังไม่มีสิทธิ์เขียนในปฏิทินของอีเมลนี้ — แชร์สิทธิ์แก้ไขให้ SA หรือเปิด Domain-wide Delegation แล้วตั้ง CALENDAR_IMPERSONATE=1",
         { status: 403 }
       );
     }
