@@ -15,20 +15,28 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
         "transition-colors duration-500 ease-out",
         "border-slate-300 dark:border-slate-600",
         bgClass,
-        "shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
+        "shadow-inner"
       ].join(" ")}
     >
-      {/* Day layer */}
-      <div className={["absolute inset-0 transition-opacity duration-500", isDark ? "opacity-0" : "opacity-100"].join(" ")}>
-        <span className="cloud cloud-1" />
-        <span className="cloud cloud-2" />
+      {/* Stars (dark) */}
+      <div className="absolute inset-0 pointer-events-none">
+        <svg width="100%" height="100%" viewBox="0 0 64 32" className={["transition-opacity duration-500", isDark ? "opacity-100" : "opacity-0"].join(" ")}> 
+          <g fill="#fff">
+            <circle cx="10" cy="7" r="0.8"/>
+            <circle cx="16" cy="13" r="0.6"/>
+            <circle cx="22" cy="5" r="0.5"/>
+            <circle cx="30" cy="9" r="0.7"/>
+            <circle cx="40" cy="6" r="0.5"/>
+            <circle cx="48" cy="12" r="0.6"/>
+            <circle cx="55" cy="8" r="0.5"/>
+          </g>
+        </svg>
       </div>
 
-      {/* Night layer */}
-      <div className={["absolute inset-0 bg-slate-900 transition-opacity duration-500", isDark ? "opacity-100" : "opacity-0"].join(" ")}>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <span key={i} className={`star star-${(i % 8) + 1}`} />
-        ))}
+      {/* Clouds (light) */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className={["cloud cloud-1", isDark ? "opacity-0" : "opacity-100"].join(" ")}></div>
+        <div className={["cloud cloud-2", isDark ? "opacity-0" : "opacity-100"].join(" ")}></div>
       </div>
 
       {/* Knob (sun/moon) */}
@@ -45,17 +53,19 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
         <svg className={["h-5 w-5 transition-opacity duration-300", isDark ? "opacity-0" : "opacity-100"].join(" ")} viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="4.2" className="fill-yellow-400" />
           <g className="stroke-yellow-400" strokeWidth="1.4" strokeLinecap="round">
-            <path d="M12 2v2.6" /><path d="M12 19.4V22" />
-            <path d="M2 12h2.6" /><path d="M19.4 12H22" />
-            <path d="M4.6 4.6l1.8 1.8" /><path d="M17.6 17.6l1.8 1.8" />
-            <path d="M19.4 4.6l-1.8 1.8" /><path d="M6.4 17.6l-1.8 1.8" />
+            <line x1="12" y1="2" x2="12" y2="5" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="5" y2="12" />
+            <line x1="19" y1="12" x2="22" y2="12" />
+            <line x1="4" y1="4" x2="6.5" y2="6.5" />
+            <line x1="17.5" y1="17.5" x2="20" y2="20" />
+            <line x1="4" y1="20" x2="6.5" y2="17.5" />
+            <line x1="17.5" y1="6.5" x2="20" y2="4" />
           </g>
         </svg>
         {/* Moon */}
-        <svg className={["absolute h-5 w-5 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
-          <path d="M16.5 12.5a7 7 0 1 1-5-9.5 6 6 0 1 0 7.7 7.7 7.1 7.1 0 0 1-2.7 1.8z" className="fill-slate-300" />
-          <circle cx="10" cy="9" r="0.9" className="fill-slate-400" />
-          <circle cx="12.2" cy="12.8" r="0.7" className="fill-slate-400" />
+        <svg className={["h-5 w-5 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 7 7 0 0 0 20 14.5Z" className="fill-slate-300" />
         </svg>
       </div>
 
@@ -64,53 +74,51 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
         .cloud {
           position: absolute;
           top: 12px;
-          height: 6px;
-          width: 22px;
+          width: 44px;
+          height: 16px;
           background: #fff;
           border-radius: 999px;
-          box-shadow: 11px -5px 0 2px #fff, 22px -2px 0 0 #fff;
-          opacity: 0.85;
-          animation: cloud-move 10s linear infinite;
+          box-shadow: 12px 0 0 2px #fff, 24px 2px 0 0 #fff;
+          filter: drop-shadow(0 1px 0 rgba(0,0,0,0.05));
+          animation: cloud-move 9s linear infinite;
         }
-        .cloud-1 { left: -16px; animation-delay: 0s; }
+        .cloud-1 { left: -48px; animation-delay: 0s; }
         .cloud-2 { left: -32px; top: 6px; transform: scale(0.8); animation-delay: 2s; }
-        @keyframes cloud-move { 0% { transform: translateX(0); } 100% { transform: translateX(95px); } }
-
-        .star {
-          position: absolute;
-          width: 2px; height: 2px;
-          background: white; border-radius: 999px; opacity: 0.6;
-          animation: twinkle 1.6s ease-in-out infinite;
-        }
-        .star-1 { top: 6px; left: 12px; animation-delay: 0s; }
-        .star-2 { top: 5px; left: 32px; animation-delay: .2s; }
-        .star-3 { top: 16px; left: 46px; animation-delay: .4s; }
-        .star-4 { top: 22px; left: 18px; animation-delay: .6s; }
-        .star-5 { top: 10px; left: 54px; animation-delay: .8s; }
-        .star-6 { top: 26px; left: 38px; animation-delay: 1.0s; }
-        .star-7 { top: 18px; left: 6px;  animation-delay: 1.2s; }
-        .star-8 { top: 27px; left: 58px; animation-delay: 1.4s; }
-
-        @keyframes twinkle { 0%,100% { opacity: .2; transform: scale(1); } 50% { opacity: .9; transform: scale(1.35); } }
+        @keyframes cloud-move { 0% { transform: translateX(0); } 100% { transform: translateX(120px); } }
       `}</style>
     </button>
   );
 }
 
-/** ========= Theme helpers (white/green clean) ========= */
-const cls = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
-const btn = (variant: "primary" | "ghost" | "danger" = "primary") =>
-  ({
-    primary:
-      "px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent transition",
-    ghost:
-      "px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-emerald-400 transition dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600",
-    danger:
-      "px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
-  }[variant]);
+/** ========= Icons ========= */
+const Icon = {
+  search: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+  ),
+  calendar: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+  ),
+  save: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><path d="M19 21H5a2 2 0 0 1-2-2V7l4-4h9l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+  ),
+  moon: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3A7 7 0 0 0 21 12.79z"/></svg>
+  ),
+  sun: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+  ),
+  check: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><path d="M20 6L9 17l-5-5"/></svg>
+  ),
+  x: (p: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}><path d="M18 6 6 18M6 6l12 12"/></svg>
+  ),
+};
 
 /** ========= Types ========= */
 type Status = "todo" | "in_progress" | "blocked" | "done" | "cancelled";
+type Priority = "low" | "medium" | "high" | "urgent";
+
 type Task = {
   id: string;
   code: string;
@@ -118,7 +126,7 @@ type Task = {
   description: string | null;
   status: Status;
   progress: number;
-  priority: "low" | "medium" | "high" | "urgent";
+  priority: Priority;
   tags: string[] | null;
   due_at: string | null;
   group_id: string;
@@ -126,92 +134,78 @@ type Task = {
   updated_at: string;
 };
 
-/** ========= Constants / Labels ========= */
-const STATUSES: Status[] = ["todo", "in_progress", "blocked", "done", "cancelled"];
-const LABEL: Record<Status, string> = {
-  todo: "To Do",
-  in_progress: "In Progress",
-  blocked: "Blocked",
-  done: "Done",
-  cancelled: "Cancelled",
-};
-
-const STATUS_BG: Record<Status, string> = {
-  todo: "bg-white dark:bg-slate-900",
-  in_progress: "bg-white dark:bg-slate-900",
-  blocked: "bg-white dark:bg-slate-900",
-  done: "bg-white dark:bg-slate-900",
-  cancelled: "bg-white dark:bg-slate-900",
-};
-const STATUS_RING: Record<Status, string> = {
-  todo: "ring-emerald-200 dark:ring-emerald-900/40",
-  in_progress: "ring-emerald-200 dark:ring-emerald-900/40",
-  blocked: "ring-rose-200 dark:ring-rose-900/40",
-  done: "ring-emerald-300 dark:ring-emerald-800/40",
-  cancelled: "ring-slate-200 dark:ring-slate-800/40",
-};
-
-const CARD_BAR: Record<Status, string> = {
-  todo: "from-emerald-400/15 to-transparent",
-  in_progress: "from-emerald-500/20 to-transparent",
-  blocked: "from-rose-400/20 to-transparent",
-  done: "from-emerald-400/25 to-transparent",
-  cancelled: "from-slate-400/15 to-transparent",
-};
-
-const PROGRESS_BAR: Record<Status, string> = {
-  done: "from-emerald-400 to-emerald-500",
-  blocked: "from-rose-400 to-rose-500",
-  todo: "from-emerald-300 to-emerald-400",
-  in_progress: "from-emerald-400 to-teal-500",
-  cancelled: "from-slate-300 to-slate-400",
-};
-
-const PR_CHIP: Record<Task["priority"], string> = {
-  urgent: "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/60",
-  high: "bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800/60",
-  medium: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/60",
-  low: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/60",
-};
-
 /** ========= Local Storage keys ========= */
 const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];
 const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];
 const THEME_KEY = "taskbot_theme"; // shared with LIFF page
+const CAL_ID_KEY = "taskbot_cal_calendarId"; // remember calendar id (global + per-group)
+function readCalId(gid?: string) {
+  try {
+    if (gid) {
+      const v = localStorage.getItem(`${CAL_ID_KEY}::${gid}`);
+      if (v) return v;
+    }
+    return localStorage.getItem(CAL_ID_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+function writeCalId(val: string, gid?: string) {
+  try {
+    localStorage.setItem(CAL_ID_KEY, val);
+    if (gid) localStorage.setItem(`${CAL_ID_KEY}::${gid}`, val);
+  } catch {}
+}
 
-const readFirst = (keys: string[]): string => {
-  try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
+const readFirst = (keys: string[]) => {
+  for (const k of keys) {
+    try { const v = localStorage.getItem(k); if (v) return v; } catch {}
+  }
   return "";
 };
-const writeAll = (keys: string[], value: string) => { try { keys.forEach((k) => localStorage.setItem(k, value)); } catch {} };
+const writeAll = (keys: string[], v: string) => {
+  for (const k of keys) {
+    try { localStorage.setItem(k, v); } catch {}
+  }
+};
 
-/** ========= Utils ========= */
-function fmtDate(v?: string | null) {
-  if (!v) return "";
-  try {
-    return new Date(v).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" });
-  } catch { return ""; }
-}
-function dueMeta(t: Task): { text: string; cls: string } {
-  if (t.status === "done") return { text: "เสร็จสิ้น", cls: "text-emerald-600 font-semibold dark:text-emerald-300" };
-  if (!t.due_at) return { text: "", cls: "text-slate-500 dark:text-slate-400" };
-  const due = new Date(t.due_at);
-  const today = new Date();
-  const sToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const sDue = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
-  const MS = 86400000;
-  const diff = Math.round((sDue - sToday) / MS);
-  if (diff > 0) return { text: `เหลืออีก ${diff} วัน`, cls: "text-emerald-700 font-semibold dark:text-emerald-300" };
-  if (diff === 0) return { text: "ครบกำหนดวันนี้", cls: "text-amber-600 font-semibold dark:text-amber-300" };
-  return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold dark:text-red-300" };
+/** ========= UI helpers ========= */
+function cls(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
-/** ===== tag chip styles (CAL1/CAL2 เด่นเป็นพิเศษ) ===== */
-function tagClass(tag: string) {
-  const t = tag.toUpperCase();
-  if (t === "CAL1") return "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800/60";
-  if (t === "CAL2") return "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800/60";
-  return "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700";
+function badgeByStatus(s: Status) {
+  return {
+    todo: "bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-800/60",
+    in_progress: "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-800/60",
+    blocked: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/60",
+    done: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/60",
+    cancelled: "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/60",
+  }[s];
+}
+
+function dotByPriority(p: Priority) {
+  return {
+    low: "bg-slate-400",
+    medium: "bg-yellow-400",
+    high: "bg-orange-500",
+    urgent: "bg-rose-600",
+  }[p];
+}
+
+function buttonVariant(variant: "primary" | "ghost" | "danger") {
+  return {
+    primary: "px-3 py-2 rounded-md bg-emerald-600 text-white",
+    ghost: "px-3 py-2 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700",
+    danger: "px-3 py-2 rounded-md bg-rose-600 text-white",
+  }[variant];
+}
+
+function miniButton(variant: "primary" | "ghost") {
+  return {
+    primary: "px-2 py-1 rounded border border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:border-emerald-500 dark:bg-emerald-900/20",
+    ghost: "px-2 py-1 rounded border border-transparent hover:border-slate-300 dark:hover:border-slate-600",
+  }[variant];
 }
 
 /** ========= Page ========= */
@@ -222,14 +216,15 @@ export default function KanbanPage() {
     const root = document.documentElement;
     if (dark) root.classList.add("dark"); else root.classList.remove("dark");
     try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch {}
-  };
+  }
   useEffect(() => {
     try {
       const saved = localStorage.getItem(THEME_KEY);
-      if (saved === "dark" || saved === "light") {
-        setIsDark(saved === "dark"); applyTheme(saved === "dark");
+      if (saved) {
+        const isDarkSaved = saved === "dark";
+        setIsDark(isDarkSaved); applyTheme(isDarkSaved);
       } else {
-        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
         setIsDark(prefersDark); applyTheme(prefersDark);
       }
     } catch { setIsDark(false); applyTheme(false); }
@@ -252,21 +247,17 @@ export default function KanbanPage() {
   const [calTitle, setCalTitle] = useState("");
   const [calDesc, setCalDesc] = useState("");
   const [calLocation, setCalLocation] = useState("");
-  const [calDate, setCalDate] = useState(""); // yyyy-mm-dd
+  const [calDate, setCalDate] = useState("");
   const [calStart, setCalStart] = useState("09:00");
   const [calEnd, setCalEnd] = useState("10:00");
 
-  /** ===== init: URL -> localStorage -> LIFF context ===== */
+  // ===== initial load (read localStorage / LIFF groupId) =====
   useEffect(() => {
     (async () => {
-      const url = new URL(window.location.href);
-      const qsGid = url.searchParams.get("group_id");
-      const qsKey = url.searchParams.get("key");
-      if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
-      if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
-
-      if (!qsGid) { const v = readFirst(GID_KEYS); if (v) setGroupId(v); }
-      if (!qsKey) { const v = readFirst(KEY_KEYS); if (v) setAdminKey(v); }
+      try {
+        // prefill groupId and adminKey from localStorage
+        const g = readFirst(GID_KEYS); if (g) setGroupId(g);
+        const v = readFirst(KEY_KEYS); if (v) setAdminKey(v); }
 
       // LIFF (ถ้าเปิดใน LINE)
       try {
@@ -281,140 +272,77 @@ export default function KanbanPage() {
     })();
   }, []);
 
+  // Load saved Calendar ID after groupId known
+  useEffect(() => {
+    const saved = readCalId(groupId || undefined);
+    if (saved) setCalCalendarId(saved);
+  }, [groupId]);
+
   /** ===== load data ===== */
   async function load() {
     if (!groupId || !adminKey) return;
     setLoading(true);
     try {
       const r = await fetch(
-        `/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}${q ? `&q=${encodeURIComponent(q)}` : ""}`
+        `/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&q=${encodeURIComponent(q)}`,
+        { headers: { "x-admin-key": adminKey } }
       );
       if (!r.ok) throw new Error(await r.text());
-      const rows: Task[] | { items: Task[] } = await r.json();
-      setData(Array.isArray(rows) ? rows : rows.items ?? []);
+      const j = await r.json();
+      setData(j.items || []);
     } catch (e) {
       console.error(e);
-      alert("โหลดงานไม่สำเร็จ ตรวจสอบ groupId หรือ adminKey");
+      alert("โหลดรายการงานไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [groupId, adminKey]);
 
-  /** ===== columns (filter + sort) ===== */
-  const columns = useMemo(() => {
-    const map: Record<Status, Task[]> = { todo: [], in_progress: [], blocked: [], done: [], cancelled: [] };
-    const kw = q.trim().toLowerCase();
-    const filtered = kw
-      ? data.filter((t) =>
-          [t.title, t.description, t.code, t.priority, ...(t.tags ?? [])]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(kw)
-        )
-      : data;
+  useEffect(() => { load(); }, [groupId, adminKey]);
 
-    const prioWeight: Record<Task["priority"], number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-    filtered
-      .slice()
-      .sort((a, b) => {
-        const da = a.due_at ? new Date(a.due_at).getTime() : Infinity;
-        const db = b.due_at ? new Date(b.due_at).getTime() : Infinity;
-        if (da !== db) return da - db;
-        return prioWeight[a.priority] - prioWeight[b.priority];
-      })
-      .forEach((t) => map[t.status].push(t));
-
-    return map;
-  }, [data, q]);
-
-  /** ===== drag & drop ===== */
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  function onDragStart(e: React.DragEvent, id: string) {
-    setDraggingId(id);
-    e.dataTransfer.setData("text/plain", id);
-    e.dataTransfer.effectAllowed = "move";
-  }
-  function onDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
-  async function onDrop(e: React.DragEvent, next: Status) {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData("text/plain");
-    const id = raw || draggingId;
-    if (!id) return;
-
-    const current = data.find((t) => t.id === id);
-    if (!current) return;
-
-    const newProgress = next === "done" ? 100 : current.progress ?? 0;
-
-    try {
-      setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: next, progress: newProgress } : t)));
-
-      const body: Partial<Pick<Task, "status" | "progress">> = next === "done" ? { status: next, progress: 100 } : { status: next };
-      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error(await r.text());
-    } catch (e) {
-      console.error(e);
-      alert("อัปเดตสถานะไม่สำเร็จ");
-      load();
-    } finally {
-      setDraggingId(null);
-    }
-  }
-
-  /** ===== open/close editor ===== */
+  /** ===== actions ===== */
   function openEditor(t: Task) {
     setEditTask(t);
-    setProgressDraft(Math.max(0, Math.min(100, Number(t.progress ?? 0))));
-    setCalTitle(t.title || "");
+    setProgressDraft(t.progress ?? 0);
+
+    // prefill calendar form
+    setCalTitle(t.title);
     setCalDesc(t.description || "");
     setCalLocation("");
-    if (t.due_at) {
-      const d = new Date(t.due_at);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      setCalDate(`${yyyy}-${mm}-${dd}`);
-    } else {
-      setCalDate("");
-    }
+
+    // default date/time: today 09:00–10:00
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    setCalDate(`${y}-${m}-${d}`);
+    setCalStart("09:00");
+    setCalEnd("10:00");
   }
-  function closeEditor() { setEditTask(null); }
+
+  function closeEditor() {
+    setEditTask(null);
+  }
+
   async function saveProgress() {
-    if (!editTask) return;
-    const id = editTask.id;
-    const newValue = Math.max(0, Math.min(100, Number(progressDraft)));
+    const t = editTask; if (!t) return;
     try {
-      setData((prev) => prev.map((t) => (t.id === id ? { ...t, progress: newValue } : t)));
-      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: newValue }),
-      });
+      const r = await fetch(`/api/admin/tasks/${t.id}`,
+        { method: "PATCH", headers: {"Content-Type":"application/json", "x-admin-key": adminKey}, body: JSON.stringify({ progress: progressDraft }) });
       if (!r.ok) throw new Error(await r.text());
-      closeEditor();
+      alert("บันทึกความคืบหน้าแล้ว");
+      closeEditor(); load();
     } catch (e) {
       console.error(e);
-      alert("บันทึกเปอร์เซ็นต์ไม่สำเร็จ");
-      load();
+      alert("บันทึกไม่สำเร็จ");
     }
   }
 
-  /** ===== Mark Done (Close Progress) ===== */
   async function markDone() {
-    if (!editTask) return;
-    const id = editTask.id;
+    const t = editTask; if (!t) return;
     try {
-      setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: "done", progress: 100 } : t)));
-      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "done", progress: 100 }),
-      });
+      const r = await fetch(`/api/admin/tasks/${t.id}`,
+        { method: "PATCH", headers: {"Content-Type":"application/json", "x-admin-key": adminKey}, body: JSON.stringify({ status: "done", progress: 100 }) });
       if (!r.ok) throw new Error(await r.text());
       closeEditor();
     } catch (e) {
@@ -440,6 +368,8 @@ export default function KanbanPage() {
       date: calDate,
       start: calStart,
       end: calEnd,
+      attendees: [],
+      source: { id: t.id, code: t.code },
     };
 
     try {
@@ -450,6 +380,7 @@ export default function KanbanPage() {
       });
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
+      try { writeCalId(calCalendarId.trim(), groupId); } catch {}
       alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
     } catch (e: any) {
       console.error("ADD_CAL_ERR", e?.message || e);
@@ -459,290 +390,260 @@ export default function KanbanPage() {
 
   /** ========= Render ========= */
  return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 dark:text-slate-100">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/85 dark:bg-slate-900/85 backdrop-blur border-b border-slate-200 dark:border-slate-700">
-        <div className="mx-auto max-w-screen-xl px-4 h-14 flex items-center gap-4">
-          <div className="font-semibold text-slate-800 dark:text-slate-100">mdes-task-bot — Kanban</div>
-          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600 dark:text-slate-300">
-            <a className="hover:text-slate-900 dark:hover:text-white" href="/liff">Tasks</a>
-            <a className="text-slate-900 dark:text-white border-b-2 border-emerald-500" href="/liff/kanban">Kanban</a>
-            <a className="hover:text-slate-900 dark:hover:text-white" href="/liff/dashboard">Dashboard</a>
-          </nav>
-
-          {/* Animated Theme Toggle */}
-          <div className="ml-2"><ThemeToggle isDark={isDark} onToggle={toggleTheme} /></div>
-
-          <button
-            className={btn("primary") + " md:hidden ml-auto"}
-            onClick={() => {
-              const url = new URL("/liff", location.origin);
-              if (groupId) url.searchParams.set("group_id", groupId);
-              if (adminKey) url.searchParams.set("key", adminKey);
-              window.open(url.toString(), "_self");
-            }}
-          >
-            LIFF TASK
-          </button>
+      <header className="sticky top-0 z-10 border-b border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur px-3 sm:px-6 py-3">
+        <div className="max-w-6xl mx-auto flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+            <h1 className="text-lg sm:text-xl font-semibold">Kanban — MDES Task Bot</h1>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <input
+              value={groupId}
+              onChange={(e) => { setGroupId(e.target.value); writeAll(GID_KEYS, e.target.value); }}
+              placeholder="Group ID"
+              className="h-9 w-[160px] sm:w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-sm"
+            />
+            <input
+              type="password"
+              value={adminKey}
+              onChange={(e) => { setAdminKey(e.target.value); writeAll(KEY_KEYS, e.target.value); }}
+              placeholder="Admin Key"
+              className="h-9 w-[160px] sm:w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-sm"
+            />
+            <button onClick={load} className={buttonVariant("primary")}>
+              โหลดงาน
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="p-4 md:p-6 max-w-[1400px] mx-auto flex-1">
-        {/* Toolbar */}
-        <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
-          <div className="flex-1">
-            <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">Group ID</label>
+      {/* Toolbar */}
+      <div className="px-3 sm:px-6 py-3 border-b border-slate-200/60 dark:border-slate-700/60">
+        <div className="max-w-6xl mx-auto flex items-center gap-2">
+          <div className="relative flex-1 max-w-lg">
+            <Icon.search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
-              className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder="กรอก Group ID หรือเปิดผ่าน LIFF เพื่อดึงอัตโนมัติ"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">Admin Key</label>
-            <input
-              className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
-              type="password"
-              value={adminKey}
-              onChange={(e) => setAdminKey(e.target.value)}
-              placeholder="ADMIN_KEY"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">ค้นหา</label>
-            <input
-              className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="คำค้น เช่น เอกสาร, @ชื่อ, tag"
+              onKeyDown={(e) => { if (e.key === 'Enter') load(); }}
+              placeholder="ค้นหาชื่องาน แท็ก หรือโค้ด"
+              className="w-full h-10 rounded-md pl-9 pr-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
             />
           </div>
-          <button className={btn("ghost")} onClick={load} disabled={loading || !groupId || !adminKey}>
-            {loading ? "กำลังโหลด..." : "รีเฟรช"}
-          </button>
-          <button
-            className={btn("primary")}
-            onClick={() => {
-              const url = new URL("/liff", location.origin);
-              if (groupId) url.searchParams.set("group_id", groupId);
-              if (adminKey) url.searchParams.set("key", adminKey);
-              window.open(url.toString(), "_self");
-            }}
-          >
-            LIFF TASK
-          </button>
+          <button onClick={load} className={buttonVariant("ghost")}>ค้นหา</button>
         </div>
+      </div>
 
-        {/* Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 min-h-[60vh]">
-          {STATUSES.map((s) => (
-            <div
-              key={s}
-              className={cls(
-                "relative border border-slate-200 dark:border-slate-700 rounded-2xl p-3 md:p-4 flex flex-col shadow-sm",
-                STATUS_BG[s],
-                draggingId && STATUS_RING[s],
-                "transition-all"
-              )}
-              onDragOver={onDragOver}
-              onDrop={(e) => onDrop(e, s)}
-            >
-              <div className={cls("absolute inset-x-0 top-0 h-8 rounded-t-2xl pointer-events-none bg-gradient-to-b", CARD_BAR[s])} />
-              <div className="flex items-center justify-between mb-3 relative z-[1]">
-                <h2 className="font-semibold capitalize text-slate-800 dark:text-slate-100">{LABEL[s]}</h2>
-                <span className="text-xs bg-slate-100 dark:bg-slate-700 dark:text-slate-100 rounded-full px-2 py-0.5">
-                  {columns[s].length}
-                </span>
-              </div>
+      {/* Main */}
+      <main className="flex-1 px-3 sm:px-6 py-4">
+        <div className="max-w-6xl mx-auto">
+          {/* Columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {(["todo","in_progress","blocked","done","cancelled"] as Status[]).map((st) => (
+              <section key={st} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                <header className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                  <span className={cls("inline-flex items-center gap-2 text-xs font-medium px-2 py-1 rounded", badgeByStatus(st))}>
+                    <span className={cls("h-2 w-2 rounded-full", st === "todo" ? "bg-slate-400" : st === "in_progress" ? "bg-sky-400" : st === "blocked" ? "bg-amber-400" : st === "done" ? "bg-emerald-500" : "bg-rose-500")} />
+                    {st.replace("_"," ")}
+                  </span>
+                  <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{data.filter(d => d.status === st).length} งาน</span>
+                </header>
 
-              <div className="flex-1 rounded-xl min-h-[200px] p-2">
-                {columns[s].map((t) => {
-                  const meta = dueMeta(t);
-                  const tags = t.tags ?? [];
-                  const shown = tags.slice(0, 2);
-                  const rest = Math.max(0, tags.length - shown.length);
-                  return (
-                    <article
-                      key={t.id}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, t.id)}
-                      onClick={() => openEditor(t)}
-                      className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 min-w-0"
-                      title={t.title}
-                    >
-                      {/* header: title + tags */}
-                      <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-slate-800 dark:text-slate-100 line-clamp-1">{t.title}</div>
-                          {t.description && (
-                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-1">{t.description}</div>
-                          )}
-                        </div>
-
-                        {/* tag chips */}
-                        <div className="shrink-0 flex items-center gap-1">
-                          {shown.map((tag, i) => (
-                            <span key={i} className={cls("text-[10px] rounded px-2 py-0.5", tagClass(tag))} title={tag}>
-                              #{tag}
-                            </span>
-                          ))}
-                          {rest > 0 && (
-                            <span className="text-[10px] bg-slate-100 dark:bg-slate-700 dark:text-slate-200 rounded px-2 py-0.5" title={tags.join(", ")}>
-                              +{rest}
-                            </span>
-                          )}
+                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {data.filter(d => d.status === st).map((t) => (
+                    <article key={t.id} className="p-3">
+                      <div className="flex items-start gap-2">
+                        <div className={cls("mt-0.5 h-2 w-2 rounded-full", dotByPriority(t.priority))} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-slate-500">#{t.code}</span>
+                            <h3 className="text-sm font-medium truncate">{t.title}</h3>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5">{t.description}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            {/* progress bar */}
+                            <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded">
+                              <div style={{ width: `${t.progress}%` }} className="h-2 bg-emerald-500 rounded" />
+                            </div>
+                            <span className="text-xs w-8 text-right">{t.progress}%</span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1">
+                            {(t.tags || []).map((tag, i) => (
+                              <span key={i} className="px-1.5 py-0.5 rounded text-[10px] border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-200">{tag}</span>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
-                      {/* meta */}
-                      <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className={cls("rounded-full px-2 py-0.5", PR_CHIP[t.priority])}>{t.priority}</span>
-                          <span className="text-slate-700 dark:text-slate-200">{t.progress ?? 0}%</span>
-                        </div>
-                        <div className="w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[16rem] text-right">
-                          {t.due_at && <div className="truncate text-slate-600 dark:text-slate-300">กำหนด {fmtDate(t.due_at)}</div>}
-                          {meta.text && <div className={cls("truncate", meta.cls)}>{meta.text}</div>}
-                        </div>
-                      </div>
-
-                      {/* progress bar */}
-                      <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className={cls("h-full rounded-full bg-gradient-to-r", PROGRESS_BAR[t.status])}
-                          style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }}
-                        />
+                      <div className="mt-3 flex items-center justify-end gap-2">
+                        <button onClick={() => openEditor(t)} className={miniButton("ghost")}>แก้ไข</button>
                       </div>
                     </article>
-                  );
-                })}
-                {columns[s].length === 0 && (
-                  <div className="text-xs text-slate-500 dark:text-slate-400 italic">(ลากการ์ดมาวางที่นี่)</div>
-                )}
-              </div>
-            </div>
-          ))}
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+
+          {loading && (
+            <div className="mt-6 text-center text-slate-500">กำลังโหลด...</div>
+          )}
         </div>
       </main>
 
-      {/* Modal: Progress Editor + Add to Calendar */}
+      {/* Editor Drawer (Modal) */}
       {editTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditor} />
-          <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">จัดการงาน</div>
-                <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">{editTask.title}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">code {editTask.code}</div>
+        <div className="fixed inset-0 z-20">
+          <div className="absolute inset-0 bg-black/40" onClick={closeEditor} />
+          <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white dark:bg-slate-900 shadow-xl border-l border-slate-200 dark:border-slate-700 overflow-auto">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-500">#{editTask.code}</span>
+                <h2 className="text-base font-semibold">แก้ไขงาน / ลงตาราง</h2>
               </div>
-              <button onClick={closeEditor} className="rounded-full px-2 py-1 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close">✕</button>
+              <button onClick={closeEditor} className={miniButton("ghost")}>
+                ปิด
+              </button>
             </div>
 
-            {/* Progress */}
-            <div className="mt-4">
-              <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ปรับความคืบหน้า</div>
-              <input
-                type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))}
-                className="w-full accent-emerald-600"
-              />
-              <div className="mt-2 flex items-center justify-between text-sm">
-                <div className="text-slate-700 dark:text-slate-200">{progressDraft}%</div>
-                <input
-                  type="number" min={0} max={100} value={progressDraft}
-                  onChange={(e) => setProgressDraft(Math.max(0, Math.min(100, Number(e.target.value))))}
-                  className="w-20 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-            </div>
-
-            {/* Add to Calendar */}
-            <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
-              <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar)</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* ❌ เดิม: อีเมลปฏิทิน (เชิญเข้าร่วม)
-                    ✅ ใหม่: Calendar ID */}
-                <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">Calendar ID (เช่น primary หรือ someone@domain)</label>
+            <div className="p-4 space-y-4">
+              {/* Progress */}
+              <section className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                <h3 className="text-sm font-medium">ความคืบหน้า</h3>
+                <div className="mt-2 flex items-center gap-2">
                   <input
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    placeholder="เช่น primary หรือ your@domain.com"
-                    value={calCalendarId}
-                    onChange={(e) => setCalCalendarId(e.target.value)}
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={progressDraft}
+                    onChange={(e) => setProgressDraft(Number(e.target.value))}
+                    className="flex-1"
                   />
+                  <span className="w-10 text-right text-sm">{progressDraft}%</span>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">ชื่อเหตุการณ์</label>
-                  <input
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    value={calTitle} onChange={(e) => setCalTitle(e.target.value)}
-                  />
+                <div className="mt-2 overflow-x-auto">
+                  <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                    <button onClick={saveProgress} className="px-3 py-2 rounded-md bg-emerald-600 text-white">บันทึกความคืบหน้า</button>
+                    <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ปิดงานเป็น Done + 100%</button>
+                  </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">รายละเอียด</label>
-                  <textarea
-                    rows={2}
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    value={calDesc} onChange={(e) => setCalDesc(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-300">วันที่</label>
-                  <input
-                    type="date"
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    value={calDate} onChange={(e) => setCalDate(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+              </section>
+
+              {/* Calendar form */}
+              <section className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Icon.calendar className="h-4 w-4" /> เพิ่มใน Google Calendar
+                </h3>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-600 dark:text-slate-300">Calendar ID (เช่น primary หรือ someone@domain)</label>
+                    <input
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      placeholder="เช่น primary หรือ your@domain.com"
+                      value={calCalendarId}
+                      onChange={(e) => { const v = e.target.value; setCalCalendarId(v); writeCalId(v, groupId); }}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-xs text-slate-600 dark:text-slate-300">ชื่อเหตุการณ์</label>
+                    <input
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calTitle}
+                      onChange={(e) => setCalTitle(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="text-xs text-slate-600 dark:text-slate-300">รายละเอียด</label>
+                    <textarea
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      rows={2}
+                      value={calDesc}
+                      onChange={(e) => setCalDesc(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-600 dark:text-slate-300">สถานที่</label>
+                    <input
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calLocation}
+                      onChange={(e) => setCalLocation(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-600 dark:text-slate-300">วันที่</label>
+                    <input
+                      type="date"
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calDate}
+                      onChange={(e) => setCalDate(e.target.value)}
+                    />
+                  </div>
+
                   <div>
                     <label className="text-xs text-slate-600 dark:text-slate-300">เริ่ม</label>
                     <input
                       type="time"
-                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      value={calStart} onChange={(e) => setCalStart(e.target.value)}
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calStart}
+                      onChange={(e) => setCalStart(e.target.value)}
                     />
                   </div>
+
                   <div>
                     <label className="text-xs text-slate-600 dark:text-slate-300">สิ้นสุด</label>
                     <input
                       type="time"
-                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      value={calEnd} onChange={(e) => setCalEnd(e.target.value)}
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calEnd}
+                      onChange={(e) => setCalEnd(e.target.value)}
                     />
                   </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">สถานที่ (ถ้ามี)</label>
-                  <input
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    placeholder="ห้องประชุม / ลิงก์ประชุม ฯลฯ" value={calLocation} onChange={(e) => setCalLocation(e.target.value)}
-                  />
-                </div>
-              </div>
 
-              <div className="mt-2 overflow-x-auto">
-                <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                  <button onClick={saveProgress} className="px-3 py-2 rounded-md bg-emerald-600 text-white">บันทึกความคืบหน้า</button>
-                  <button onClick={addToCalendarServer} className="px-3 py-2 rounded-md bg-emerald-600 text-white">เพิ่มใน Google Calendar</button>
+                <div className="mt-2 overflow-x-auto">
+                  <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                    <button onClick={saveProgress} className="px-3 py-2 rounded-md bg-emerald-600 text-white">บันทึกความคืบหน้า</button>
+                    <button onClick={addToCalendarServer} className="px-3 py-2 rounded-md bg-emerald-600 text-white">เพิ่มใน Google Calendar</button>
+                  </div>
                 </div>
-              </div>
 
               <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                 * ระบบจะใช้ Service Account บันทึก Event ลง Calendar ID ที่ระบุโดยตรง (ต้องแชร์สิทธิ์ให้ Service Account เขียนได้)
               </div>
-            </div>
+            </section>
 
             {/* Footer actions */}
             <div className="mt-4 flex items-center justify-between">
-              <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ทำเสร็จ (100%)</button>
-              <button onClick={closeEditor} className="px-3 py-2 rounded-md bg-white border">ปิด</button>
+              <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ปิดงานเป็น Done + 100%</button>
+              <div className="text-xs text-slate-500">แก้ไขงาน: <span className="font-mono">#{editTask.code}</span></div>
             </div>
           </div>
         </div>
+      </div>
       )}
+
+      {/* Footer */}
+      <footer className="px-3 sm:px-6 py-4 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <span>MDES Task Bot — Kanban</span>
+          <span>v0.3</span>
+        </div>
+      </footer>
     </div>
   );
+}
+
+/** ========= Tag color helpers (optional) ========= */
+function tagClass(tag: string) {
+  const t = tag.toUpperCase();
+  if (t === "CAL1") return "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800/60";
+  if (t === "CAL2") return "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800/60";
+  return "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700";
 }
