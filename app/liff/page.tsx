@@ -1,4 +1,4 @@
-// app/liff/page.tsx
+// app/liff/page.ts
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import Script from "next/script";
