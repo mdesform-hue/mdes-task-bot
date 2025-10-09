@@ -1,15 +1,116 @@
 // app/liff/kanban/page.tsx
 "use client";
-
 import { useEffect, useMemo, useState } from "react";
-import Script from "next/script";
+import type React from "react";
 
-/* =========================
-   Types
-========================= */
+/** ========= Toggle Switch Animation (compact 64×32px) ========= */
+function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => void }) {
+  const bgClass = isDark ? "bg-slate-900" : "bg-sky-300";
+  return (
+    <button
+      onClick={onToggle}
+      aria-label="Toggle dark mode"
+      className={[
+        "relative h-8 w-16 rounded-full border overflow-hidden", // 32×64
+        "transition-colors duration-500 ease-out",
+        "border-slate-300 dark:border-slate-600",
+        bgClass,
+        "shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
+      ].join(" ")}
+    >
+      {/* Day layer */}
+      <div className={["absolute inset-0 transition-opacity duration-500", isDark ? "opacity-0" : "opacity-100"].join(" ")}>
+        <span className="cloud cloud-1" />
+        <span className="cloud cloud-2" />
+      </div>
+
+      {/* Night layer */}
+      <div className={["absolute inset-0 bg-slate-900 transition-opacity duration-500", isDark ? "opacity-100" : "opacity-0"].join(" ")}>
+        {Array.from({ length: 12 }).map((_, i) => (
+          <span key={i} className={`star star-${(i % 8) + 1}`} />
+        ))}
+      </div>
+
+      {/* Knob (sun/moon) */}
+      <div
+        className={[
+          "absolute top-1 left-1 h-6 w-6 rounded-full", // 24px
+          "transition-transform duration-500 ease-out",
+          isDark ? "translate-x-[32px]" : "translate-x-0", // 64 - 24 - 8 = 32
+          "bg-yellow-300 dark:bg-slate-100 shadow-md",
+          "flex items-center justify-center",
+        ].join(" ")}
+      >
+        {/* Sun */}
+        <svg className={["h-5 w-5 transition-opacity duration-300", isDark ? "opacity-0" : "opacity-100"].join(" ")} viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4.2" className="fill-yellow-400" />
+          <g className="stroke-yellow-400" strokeWidth="1.4" strokeLinecap="round">
+            <path d="M12 2v2.6" /><path d="M12 19.4V22" />
+            <path d="M2 12h2.6" /><path d="M19.4 12H22" />
+            <path d="M4.6 4.6l1.8 1.8" /><path d="M17.6 17.6l1.8 1.8" />
+            <path d="M19.4 4.6l-1.8 1.8" /><path d="M6.4 17.6l-1.8 1.8" />
+          </g>
+        </svg>
+        {/* Moon */}
+        <svg className={["absolute h-5 w-5 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
+          <path d="M16.5 12.5a7 7 0 1 1-5-9.5 6 6 0 1 0 7.7 7.7 7.1 7.1 0 0 1-2.7 1.8z" className="fill-slate-300" />
+          <circle cx="10" cy="9" r="0.9" className="fill-slate-400" />
+          <circle cx="12.2" cy="12.8" r="0.7" className="fill-slate-400" />
+        </svg>
+      </div>
+
+      {/* local styles for clouds/stars */}
+      <style jsx>{`
+        .cloud {
+          position: absolute;
+          top: 12px;
+          height: 6px;
+          width: 22px;
+          background: #fff;
+          border-radius: 999px;
+          box-shadow: 11px -5px 0 2px #fff, 22px -2px 0 0 #fff;
+          opacity: 0.85;
+          animation: cloud-move 10s linear infinite;
+        }
+        .cloud-1 { left: -16px; animation-delay: 0s; }
+        .cloud-2 { left: -32px; top: 6px; transform: scale(0.8); animation-delay: 2s; }
+        @keyframes cloud-move { 0% { transform: translateX(0); } 100% { transform: translateX(95px); } }
+
+        .star {
+          position: absolute;
+          width: 2px; height: 2px;
+          background: white; border-radius: 999px; opacity: 0.6;
+          animation: twinkle 1.6s ease-in-out infinite;
+        }
+        .star-1 { top: 6px; left: 12px; animation-delay: 0s; }
+        .star-2 { top: 5px; left: 32px; animation-delay: .2s; }
+        .star-3 { top: 16px; left: 46px; animation-delay: .4s; }
+        .star-4 { top: 22px; left: 18px; animation-delay: .6s; }
+        .star-5 { top: 10px; left: 54px; animation-delay: .8s; }
+        .star-6 { top: 26px; left: 38px; animation-delay: 1.0s; }
+        .star-7 { top: 18px; left: 6px;  animation-delay: 1.2s; }
+        .star-8 { top: 27px; left: 58px; animation-delay: 1.4s; }
+
+        @keyframes twinkle { 0%,100% { opacity: .2; transform: scale(1); } 50% { opacity: .9; transform: scale(1.35); } }
+      `}</style>
+    </button>
+  );
+}
+
+/** ========= Theme helpers (white/green clean) ========= */
+const cls = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
+const btn = (variant: "primary" | "ghost" | "danger" = "primary") =>
+  ({
+    primary:
+      "px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent transition",
+    ghost:
+      "px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-emerald-400 transition dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600",
+    danger:
+      "px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
+  }[variant]);
+
+/** ========= Types ========= */
 type Status = "todo" | "in_progress" | "blocked" | "done" | "cancelled";
-type Priority = "low" | "medium" | "high" | "urgent";
-
 type Task = {
   id: string;
   code: string;
@@ -17,7 +118,7 @@ type Task = {
   description: string | null;
   status: Status;
   progress: number;
-  priority: Priority;
+  priority: "low" | "medium" | "high" | "urgent";
   tags: string[] | null;
   due_at: string | null;
   group_id: string;
@@ -25,479 +126,623 @@ type Task = {
   updated_at: string;
 };
 
-type Column = {
-  key: Status;
-  title: string;
-  hint?: string;
+/** ========= Constants / Labels ========= */
+const STATUSES: Status[] = ["todo", "in_progress", "blocked", "done", "cancelled"];
+const LABEL: Record<Status, string> = {
+  todo: "To Do",
+  in_progress: "In Progress",
+  blocked: "Blocked",
+  done: "Done",
+  cancelled: "Cancelled",
 };
 
-/* =========================
-   Constants
-========================= */
-const COLUMNS: Column[] = [
-  { key: "todo",         title: "To Do" },
-  { key: "in_progress",  title: "In Progress" },
-  { key: "blocked",      title: "Blocked",   hint: "(รอการดำเนินการ)" },
-  { key: "done",         title: "Done" },
-  { key: "cancelled",    title: "Cancelled" },
-];
+const STATUS_BG: Record<Status, string> = {
+  todo: "bg-white dark:bg-slate-900",
+  in_progress: "bg-white dark:bg-slate-900",
+  blocked: "bg-white dark:bg-slate-900",
+  done: "bg-white dark:bg-slate-900",
+  cancelled: "bg-white dark:bg-slate-900",
+};
+const STATUS_RING: Record<Status, string> = {
+  todo: "ring-emerald-200 dark:ring-emerald-900/40",
+  in_progress: "ring-emerald-200 dark:ring-emerald-900/40",
+  blocked: "ring-rose-200 dark:ring-rose-900/40",
+  done: "ring-emerald-300 dark:ring-emerald-800/40",
+  cancelled: "ring-slate-200 dark:ring-slate-800/40",
+};
 
-const STATUS: Status[] = ["todo","in_progress","blocked","done","cancelled"];
-const PRIORITIES: Priority[] = ["low","medium","high","urgent"];
+const CARD_BAR: Record<Status, string> = {
+  todo: "from-emerald-400/15 to-transparent",
+  in_progress: "from-emerald-500/20 to-transparent",
+  blocked: "from-rose-400/20 to-transparent",
+  done: "from-emerald-400/25 to-transparent",
+  cancelled: "from-slate-400/15 to-transparent",
+};
 
-const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."];
+const PROGRESS_BAR: Record<Status, string> = {
+  done: "from-emerald-400 to-emerald-500",
+  blocked: "from-rose-400 to-rose-500",
+  todo: "from-emerald-300 to-emerald-400",
+  in_progress: "from-emerald-400 to-teal-500",
+  cancelled: "from-slate-300 to-slate-400",
+};
 
-const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];  // groupId
-const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];   // adminKey
+const PR_CHIP: Record<Task["priority"], string> = {
+  urgent: "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/60",
+  high: "bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800/60",
+  medium: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/60",
+  low: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/60",
+};
 
-// ===== remember only Calendar ID =====
-const LS_CAL_ID = "taskbot_cal_calendarId";
-const safeGet = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
-const safeSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} };
+/** ========= Local Storage keys ========= */
+const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];
+const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];
+const THEME_KEY = "taskbot_theme"; // shared with LIFF page
 
-/* =========================
-   Helpers
-========================= */
 const readFirst = (keys: string[]): string => {
   try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
   return "";
 };
-const writeAll = (keys: string[], value: string) => { try { keys.forEach(k => localStorage.setItem(k, value)); } catch {} };
+const writeAll = (keys: string[], value: string) => { try { keys.forEach((k) => localStorage.setItem(k, value)); } catch {} };
 
-const tagsToStr = (tags: string[] | null | undefined) => (tags ?? []).join(", ");
-const parseTags = (s: string) => (s ?? "").split(",").map(x=>x.trim()).filter(Boolean);
+/** ========= Utils ========= */
+function fmtDate(v?: string | null) {
+  if (!v) return "";
+  try {
+    return new Date(v).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" });
+  } catch { return ""; }
+}
+function dueMeta(t: Task): { text: string; cls: string } {
+  if (t.status === "done") return { text: "เสร็จสิ้น", cls: "text-emerald-600 font-semibold dark:text-emerald-300" };
+  if (!t.due_at) return { text: "", cls: "text-slate-500 dark:text-slate-400" };
+  const due = new Date(t.due_at);
+  const today = new Date();
+  const sToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const sDue = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+  const MS = 86400000;
+  const diff = Math.round((sDue - sToday) / MS);
+  if (diff > 0) return { text: `เหลืออีก ${diff} วัน`, cls: "text-emerald-700 font-semibold dark:text-emerald-300" };
+  if (diff === 0) return { text: "ครบกำหนดวันนี้", cls: "text-amber-600 font-semibold dark:text-amber-300" };
+  return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold dark:text-red-300" };
+}
 
-const fmtDate = (iso: string | null) =>
-  iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso)) : "";
+/** ===== tag chip styles (CAL1/CAL2 เด่นเป็นพิเศษ) ===== */
+function tagClass(tag: string) {
+  const t = tag.toUpperCase();
+  if (t === "CAL1") return "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800/60";
+  if (t === "CAL2") return "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:text-violet-300 dark:border-violet-800/60";
+  return "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700";
+}
 
-/* =========================
-   Component
-========================= */
+/** ========= Page ========= */
 export default function KanbanPage() {
-  // route/keys
-  const [ready, setReady] = useState(false);
+  // ===== Theme state (shared with other pages) =====
+  const [isDark, setIsDark] = useState(false);
+  const applyTheme = (dark: boolean) => {
+    const root = document.documentElement;
+    if (dark) root.classList.add("dark"); else root.classList.remove("dark");
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch {}
+  };
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "dark" || saved === "light") {
+        setIsDark(saved === "dark"); applyTheme(saved === "dark");
+      } else {
+        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+        setIsDark(prefersDark); applyTheme(prefersDark);
+      }
+    } catch { setIsDark(false); applyTheme(false); }
+  }, []);
+  const toggleTheme = () => setIsDark((d) => (applyTheme(!d), !d));
+
+  // shared state
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
-
-  // data
-  const [items, setItems] = useState<Task[]>([]);
   const [q, setQ] = useState("");
-  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
-  const [draft, setDraft] = useState<Record<string, Partial<Task>>>({});
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<Task[]>([]);
 
-  // selection (multi)
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const toggleSel = (id: string, on?: boolean) =>
-    setSelected(prev => { const s = new Set(prev); (on ?? !s.has(id)) ? s.add(id) : s.delete(id); return s; });
-  const clearSel = () => setSelected(new Set());
-  const selectAllInStatus = (status: Status) =>
-    setSelected(new Set(items.filter(i => i.status === status).map(i => i.id)));
-
-  // editor modal
+  // editor
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [progressDraft, setProgressDraft] = useState<number>(0);
 
-  // ===== Calendar form (จำแค่ Calendar ID) =====
+  // calendar template fields
   const [calCalendarId, setCalCalendarId] = useState("");
+  const [calTitle, setCalTitle] = useState("");
+  const [calDesc, setCalDesc] = useState("");
+  const [calLocation, setCalLocation] = useState("");
+  const [calDate, setCalDate] = useState(""); // yyyy-mm-dd
+  const [calStart, setCalStart] = useState("09:00");
+  const [calEnd, setCalEnd] = useState("10:00");
 
-  // preload only calendar id from LS once
-  useEffect(() => { setCalCalendarId(safeGet(LS_CAL_ID)); }, []);
-
-  // ===== init keys (URL -> localStorage -> LIFF) =====
+  /** ===== init: URL -> localStorage -> LIFF context ===== */
   useEffect(() => {
     (async () => {
       const url = new URL(window.location.href);
       const qsGid = url.searchParams.get("group_id");
       const qsKey = url.searchParams.get("key");
-
       if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
       if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
 
-      if (!qsGid) { const lsGid = readFirst(GID_KEYS); if (lsGid) setGroupId(lsGid); }
-      if (!qsKey) { const lsKey = readFirst(KEY_KEYS); if (lsKey) setAdminKey(lsKey); }
+      if (!qsGid) { const v = readFirst(GID_KEYS); if (v) setGroupId(v); }
+      if (!qsKey) { const v = readFirst(KEY_KEYS); if (v) setAdminKey(v); }
 
+      // LIFF (ถ้าเปิดใน LINE)
       try {
         const liff: any = (window as any).liff;
-        if (process.env.NEXT_PUBLIC_LIFF_ID) {
-          if (liff && !liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
+        if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
+          if (!liff.isInitialized?.()) await liff.init({ liffId: process.env.NEXT_PUBLIC_LIFF_ID });
           if (liff?.isLoggedIn && !liff.isLoggedIn()) { liff.login(); return; }
           const ctx = liff?.getContext?.();
-          if (!groupId && ctx?.type === "group" && ctx.groupId) {
-            setGroupId(ctx.groupId); writeAll(GID_KEYS, ctx.groupId);
-          }
+          if (ctx?.type === "group" && ctx.groupId) { setGroupId(ctx.groupId); writeAll(GID_KEYS, ctx.groupId); }
         }
       } catch {}
-
-      setReady(true);
     })();
   }, []);
 
-  // load tasks
-  const load = async () => {
+  /** ===== load data ===== */
+  async function load() {
     if (!groupId || !adminKey) return;
-    const r = await fetch(`/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&q=${encodeURIComponent(q)}&key=${encodeURIComponent(adminKey)}`);
-    const j = r.ok ? await r.json() : [];
-    setItems(Array.isArray(j) ? j : (j.items ?? []));
-    clearSel();
-  };
-  useEffect(() => { if (ready && groupId && adminKey) load(); /* eslint-disable-next-line */ }, [ready, groupId, adminKey]);
+    setLoading(true);
+    try {
+      const r = await fetch(
+        `/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}${q ? `&q=${encodeURIComponent(q)}` : ""}`
+      );
+      if (!r.ok) throw new Error(await r.text());
+      const rows: Task[] | { items: Task[] } = await r.json();
+      setData(Array.isArray(rows) ? rows : rows.items ?? []);
+    } catch (e) {
+      console.error(e);
+      alert("โหลดงานไม่สำเร็จ ตรวจสอบ groupId หรือ adminKey");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [groupId, adminKey]);
 
-  // helpers
-  const markSaving = (id: string, on: boolean) =>
-    setSavingIds(prev => { const s = new Set(prev); on ? s.add(id) : s.delete(id); return s; });
+  /** ===== columns (filter + sort) ===== */
+  const columns = useMemo(() => {
+    const map: Record<Status, Task[]> = { todo: [], in_progress: [], blocked: [], done: [], cancelled: [] };
+    const kw = q.trim().toLowerCase();
+    const filtered = kw
+      ? data.filter((t) =>
+          [t.title, t.description, t.code, t.priority, ...(t.tags ?? [])]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(kw)
+        )
+      : data;
 
-  const change = (id: string, patch: Partial<Task>) =>
-    setDraft(d => ({ ...d, [id]: { ...d[id], ...patch } }));
+    const prioWeight: Record<Task["priority"], number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+    filtered
+      .slice()
+      .sort((a, b) => {
+        const da = a.due_at ? new Date(a.due_at).getTime() : Infinity;
+        const db = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+        if (da !== db) return da - db;
+        return prioWeight[a.priority] - prioWeight[b.priority];
+      })
+      .forEach((t) => map[t.status].push(t));
 
-  const applyDraftToItem = (item: Task, patch: Partial<Task> = {}) => {
-    const d = draft[item.id] || {};
-    return { ...item, ...d, ...patch };
-  };
+    return map;
+  }, [data, q]);
 
-  // save one row
-  const saveRow = async (id: string, extra?: Partial<Task>) => {
-    const body = { ...(draft[id] || {}), ...(extra || {}) };
-    if (!Object.keys(body).length) return;
+  /** ===== drag & drop ===== */
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  function onDragStart(e: React.DragEvent, id: string) {
+    setDraggingId(id);
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+  async function onDrop(e: React.DragEvent, next: Status) {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("text/plain");
+    const id = raw || draggingId;
+    if (!id) return;
 
-    // optimistic
-    setItems(prev => prev.map(x => x.id === id ? ({ ...x, ...body }) as Task : x));
-    markSaving(id, true);
+    const current = data.find((t) => t.id === id);
+    if (!current) return;
+
+    const newProgress = next === "done" ? 100 : current.progress ?? 0;
 
     try {
+      setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: next, progress: newProgress } : t)));
+
+      const body: Partial<Pick<Task, "status" | "progress">> = next === "done" ? { status: next, progress: 100 } : { status: next };
       const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
-      setDraft(d => { const { [id]:_, ...rest } = d; return rest; });
-      await load();
     } catch (e) {
-      // rollback by reload
-      await load();
-      alert("บันทึกไม่สำเร็จ");
+      console.error(e);
+      alert("อัปเดตสถานะไม่สำเร็จ");
+      load();
     } finally {
-      markSaving(id, false);
+      setDraggingId(null);
     }
-  };
+  }
 
-  // delete selected
-  const bulkDelete = async () => {
-    if (!selected.size) return;
-    if (!confirm(`ลบ ${selected.size} งาน?`)) return;
-    const ids = Array.from(selected);
-    // optimistic
-    setItems(prev => prev.filter(x => !selected.has(x.id)));
-    await Promise.all(ids.map(id =>
-      fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" })
-    ));
-    clearSel();
-    await load();
-  };
-
-  // drag & drop (ใช้ pointer events อย่างง่าย)
-  const onDropTo = async (status: Status, task: Task) => {
-    const extra: Partial<Task> = { status };
-    if (status === "done") extra.progress = 100; // ✅ auto 100% when Done
-    await saveRow(task.id, extra);
-  };
-
-  // group by column
-  const byCol = useMemo(() => {
-    const map: Record<Status, Task[]> = {
-      todo: [], in_progress: [], blocked: [], done: [], cancelled: []
-    };
-    for (const t of items) map[t.status].push(t);
-    return map;
-  }, [items]);
-
-  // open editor (modal)
-  const openEditor = (t: Task) => {
+  /** ===== open/close editor ===== */
+  function openEditor(t: Task) {
     setEditTask(t);
-  };
-
-  // add to google calendar (uses only calendarId)
-  const addToCalendar = async () => {
-    if (!editTask) return;
-    if (!calCalendarId.trim()) {
-      alert("กรอก Calendar ID ก่อน");
-      return;
+    setProgressDraft(Math.max(0, Math.min(100, Number(t.progress ?? 0))));
+    setCalTitle(t.title || "");
+    setCalDesc(t.description || "");
+    setCalLocation("");
+    if (t.due_at) {
+      const d = new Date(t.due_at);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      setCalDate(`${yyyy}-${mm}-${dd}`);
+    } else {
+      setCalDate("");
     }
-    // จดจำ calendar id
-    safeSet(LS_CAL_ID, calCalendarId);
+  }
+  function closeEditor() { setEditTask(null); }
+  async function saveProgress() {
+    if (!editTask) return;
+    const id = editTask.id;
+    const newValue = Math.max(0, Math.min(100, Number(progressDraft)));
+    try {
+      setData((prev) => prev.map((t) => (t.id === id ? { ...t, progress: newValue } : t)));
+      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: newValue }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      closeEditor();
+    } catch (e) {
+      console.error(e);
+      alert("บันทึกเปอร์เซ็นต์ไม่สำเร็จ");
+      load();
+    }
+  }
 
-    const baseDate = editTask.due_at
-      ? new Date(editTask.due_at)
-      : new Date();
+  /** ===== Mark Done (Close Progress) ===== */
+  async function markDone() {
+    if (!editTask) return;
+    const id = editTask.id;
+    try {
+      setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: "done", progress: 100 } : t)));
+      const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "done", progress: 100 }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      closeEditor();
+    } catch (e) {
+      console.error(e);
+      alert("ปิดงานไม่สำเร็จ");
+      load();
+    }
+  }
 
-    // default: 09:00 - 10:00 (เวลาไทย)
-    const dateStr = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"
-    }).format(baseDate); // yyyy-mm-dd
 
-    const startISO = new Date(`${dateStr}T09:00:00+07:00`).toISOString();
-    const endISO   = new Date(`${dateStr}T10:00:00+07:00`).toISOString();
+  /** ===== Add to Calendar (server) ===== */
+  async function addToCalendarServer() {
+    const t = editTask;
+    if (!t) return;
+    if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
+    if (!calCalendarId.trim()) { alert("กรุณากรอก Calendar ID"); return; }
+
+    const body = {
+      calendarId: calCalendarId.trim(),          // <- ใช้ Calendar ID ที่กำหนด
+      title: calTitle || t.title,
+      description: calDesc || t.description || "",
+      location: calLocation || "",
+      date: calDate,
+      start: calStart,
+      end: calEnd,
+    };
 
     try {
       const r = await fetch("/api/calendar/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          calendarId: calCalendarId,
-          title: editTask.title || "New event",
-          description: editTask.description || undefined,
-          location: undefined,
-          startISO,
-          endISO,
-        }),
+        body: JSON.stringify(body),
       });
+      if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
-      if (!r.ok || !j?.ok) throw new Error(j?.error || "failed");
-      alert("เพิ่มใน Google Calendar สำเร็จ");
-      setEditTask(null);
+      alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
     } catch (e: any) {
-      alert(`ลงตารางไม่สำเร็จ — ${e?.message || e}`);
+      console.error("ADD_CAL_ERR", e?.message || e);
+      alert("ลงตารางไม่สำเร็จ — ตรวจสิทธิ์แชร์ปฏิทิน, บทบาท Service Account และ ENV อีกครั้ง");
     }
-  };
+  }
 
-  // top bar buttons
-  const openDashboard = () => {
-    const u = new URL("/liff/dashboard", location.origin);
-    if (groupId) u.searchParams.set("group_id", groupId);
-    if (adminKey) u.searchParams.set("key", adminKey);
-    window.open(u.toString(), "_self");
-  };
-
-  /* ============== UI ============== */
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="afterInteractive" />
-
-      <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b">
-        <div className="h-14 px-4 md:px-8 flex items-center gap-3">
-          <div className="font-semibold">mdes-task-bot — Kanban</div>
-          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm">
-            <a className="hover:underline" href="/liff">Tasks</a>
-            <a className="font-semibold border-b-2 border-emerald-500" href="/liff/kanban">Kanban</a>
-            <a className="hover:underline" onClick={openDashboard}>Dashboard</a>
+  /** ========= Render ========= */
+ return (
+    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 dark:text-slate-100">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white/85 dark:bg-slate-900/85 backdrop-blur border-b border-slate-200 dark:border-slate-700">
+        <div className="mx-auto max-w-screen-xl px-4 h-14 flex items-center gap-4">
+          <div className="font-semibold text-slate-800 dark:text-slate-100">mdes-task-bot — Kanban</div>
+          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600 dark:text-slate-300">
+            <a className="hover:text-slate-900 dark:hover:text-white" href="/liff">Tasks</a>
+            <a className="text-slate-900 dark:text-white border-b-2 border-emerald-500" href="/liff/kanban">Kanban</a>
+            <a className="hover:text-slate-900 dark:hover:text-white" href="/liff/dashboard">Dashboard</a>
           </nav>
-          <button className="md:hidden ml-auto bg-emerald-600 text-white px-3 py-2 rounded" onClick={openDashboard}>
-            Dashboard
+
+          {/* Animated Theme Toggle */}
+          <div className="ml-2"><ThemeToggle isDark={isDark} onToggle={toggleTheme} /></div>
+
+          <button
+            className={btn("primary") + " md:hidden ml-auto"}
+            onClick={() => {
+              const url = new URL("/liff", location.origin);
+              if (groupId) url.searchParams.set("group_id", groupId);
+              if (adminKey) url.searchParams.set("key", adminKey);
+              window.open(url.toString(), "_self");
+            }}
+          >
+            LIFF TASK
           </button>
         </div>
       </header>
 
-      <main className="px-4 md:px-8 py-5">
-        {/* controls */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <input className="border px-3 py-2 rounded w-60"
-                 placeholder="ค้นหา"
-                 value={q}
-                 onChange={e=>setQ(e.target.value)} />
-          <button className="px-3 py-2 rounded bg-black text-white" onClick={load}>รีเฟรช</button>
-
-          {/* bulk delete visible when selected */}
-          {selected.size > 0 && (
-            <button className="ml-2 px-3 py-2 rounded bg-rose-600 text-white" onClick={bulkDelete}>
-              ลบ {selected.size} งานที่เลือก
-            </button>
-          )}
+      <main className="p-4 md:p-6 max-w-[1400px] mx-auto flex-1">
+        {/* Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4 mb-4">
+          <div className="flex-1">
+            <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">Group ID</label>
+            <input
+              className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              placeholder="กรอก Group ID หรือเปิดผ่าน LIFF เพื่อดึงอัตโนมัติ"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">Admin Key</label>
+            <input
+              className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
+              type="password"
+              value={adminKey}
+              onChange={(e) => setAdminKey(e.target.value)}
+              placeholder="ADMIN_KEY"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">ค้นหา</label>
+            <input
+              className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="คำค้น เช่น เอกสาร, @ชื่อ, tag"
+            />
+          </div>
+          <button className={btn("ghost")} onClick={load} disabled={loading || !groupId || !adminKey}>
+            {loading ? "กำลังโหลด..." : "รีเฟรช"}
+          </button>
+          <button
+            className={btn("primary")}
+            onClick={() => {
+              const url = new URL("/liff", location.origin);
+              if (groupId) url.searchParams.set("group_id", groupId);
+              if (adminKey) url.searchParams.set("key", adminKey);
+              window.open(url.toString(), "_self");
+            }}
+          >
+            LIFF TASK
+          </button>
         </div>
 
-        {/* board */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          {COLUMNS.map(col => {
-            const tasks = byCol[col.key] || [];
-            return (
-              <div key={col.key} className="bg-white rounded-2xl border shadow-sm p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium">{col.title}</div>
-                  <div className="text-xs text-slate-500">{tasks.length}</div>
-                </div>
-                {col.hint && <div className="text-xs text-slate-500 mb-2">{col.hint}</div>}
+        {/* Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 min-h-[60vh]">
+          {STATUSES.map((s) => (
+            <div
+              key={s}
+              className={cls(
+                "relative border border-slate-200 dark:border-slate-700 rounded-2xl p-3 md:p-4 flex flex-col shadow-sm",
+                STATUS_BG[s],
+                draggingId && STATUS_RING[s],
+                "transition-all"
+              )}
+              onDragOver={onDragOver}
+              onDrop={(e) => onDrop(e, s)}
+            >
+              <div className={cls("absolute inset-x-0 top-0 h-8 rounded-t-2xl pointer-events-none bg-gradient-to-b", CARD_BAR[s])} />
+              <div className="flex items-center justify-between mb-3 relative z-[1]">
+                <h2 className="font-semibold capitalize text-slate-800 dark:text-slate-100">{LABEL[s]}</h2>
+                <span className="text-xs bg-slate-100 dark:bg-slate-700 dark:text-slate-100 rounded-full px-2 py-0.5">
+                  {columns[s].length}
+                </span>
+              </div>
 
-                {/* select all + dropzone */}
-                <div className="flex items-center justify-between mb-2">
-                  <button className="text-xs text-slate-600 underline"
-                          onClick={() => selectAllInStatus(col.key)}>
-                    เลือกทั้งหมด
-                  </button>
-                  <span className="text-[10px] text-slate-400">ลากการ์ดมาวางเพื่อย้ายสถานะ</span>
-                </div>
-
-                <div
-                  className="min-h-[200px] space-y-2"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    const payload = e.dataTransfer.getData("text/plain");
-                    if (!payload) return;
-                    try {
-                      const t: Task = JSON.parse(payload);
-                      onDropTo(col.key, t);
-                    } catch {}
-                  }}
-                >
-                  {tasks.map(t => {
-                    const d = draft[t.id] || {};
-                    const cur = { ...t, ...d };
-                    const isSaving = savingIds.has(t.id);
-                    const late = cur.due_at ? (new Date(cur.due_at).getTime() < Date.now() && cur.status !== "done") : false;
-
-                    return (
-                      <div
-                        key={t.id}
-                        className="group rounded-xl border p-3 bg-white hover:bg-slate-50"
-                        draggable
-                        onDragStart={(e) => e.dataTransfer.setData("text/plain", JSON.stringify(t))}
-                      >
-                        {/* header */}
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="text-sm font-medium line-clamp-2">{cur.title || "(ไม่มีชื่อ)"}</div>
-                          {/* Save button */}
-                          <button
-                            className="text-xs px-2 py-1 rounded bg-blue-600 text-white opacity-0 group-hover:opacity-100 transition"
-                            onClick={() => saveRow(t.id)}
-                            disabled={isSaving}
-                          >
-                            {isSaving ? "Saving…" : "Save"}
-                          </button>
+              <div className="flex-1 rounded-xl min-h-[200px] p-2">
+                {columns[s].map((t) => {
+                  const meta = dueMeta(t);
+                  const tags = t.tags ?? [];
+                  const shown = tags.slice(0, 2);
+                  const rest = Math.max(0, tags.length - shown.length);
+                  return (
+                    <article
+                      key={t.id}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, t.id)}
+                      onClick={() => openEditor(t)}
+                      className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 min-w-0"
+                      title={t.title}
+                    >
+                      {/* header: title + tags */}
+                      <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-slate-800 dark:text-slate-100 line-clamp-1">{t.title}</div>
+                          {t.description && (
+                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-1">{t.description}</div>
+                          )}
                         </div>
 
-                        {/* meta */}
-                        <div className="flex items-center gap-2 text-[11px] mb-2">
-                          <span className="font-mono text-slate-500">{/* show tags instead of code */}
-                            {(cur.tags ?? []).slice(0,2).map(tag => (
-                              <span key={tag} className="mr-1 inline-flex items-center rounded px-1.5 py-0.5 bg-slate-100 text-slate-700">
-                                #{tag}
-                              </span>
-                            ))}
-                          </span>
-                          {cur.priority && (
-                            <span className={`inline-flex items-center rounded px-1.5 py-0.5 ${
-                              cur.priority==="urgent" ? "bg-rose-100 text-rose-700" :
-                              cur.priority==="high"   ? "bg-orange-100 text-orange-700" :
-                              cur.priority==="medium" ? "bg-amber-100 text-amber-700" :
-                                                        "bg-slate-100 text-slate-600"
-                            }`}>{cur.priority}</span>
-                          )}
-                          {cur.due_at && (
-                            <span className={`ml-auto inline-flex items-center rounded px-1.5 py-0.5 ${
-                              late ? "bg-rose-100 text-rose-700" : "bg-blue-100 text-blue-700"
-                            }`}>
-                              {fmtDate(cur.due_at)}
+                        {/* tag chips */}
+                        <div className="shrink-0 flex items-center gap-1">
+                          {shown.map((tag, i) => (
+                            <span key={i} className={cls("text-[10px] rounded px-2 py-0.5", tagClass(tag))} title={tag}>
+                              #{tag}
+                            </span>
+                          ))}
+                          {rest > 0 && (
+                            <span className="text-[10px] bg-slate-100 dark:bg-slate-700 dark:text-slate-200 rounded px-2 py-0.5" title={tags.join(", ")}>
+                              +{rest}
                             </span>
                           )}
                         </div>
+                      </div>
 
-                        {/* controls */}
-                        <div className="space-y-2">
-                          <textarea
-                            className="w-full border rounded px-2 py-1 text-sm"
-                            rows={2}
-                            placeholder="รายละเอียด"
-                            value={cur.description ?? ""}
-                            onChange={e=>change(t.id,{ description:e.target.value })}
-                          />
-
-                          <div className="flex items-center gap-2">
-                            <select
-                              className="border rounded px-2 py-1 text-sm"
-                              value={cur.status}
-                              onChange={e=>change(t.id,{ status: e.target.value as Status })}
-                            >
-                              {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-
-                            <input
-                              type="number" min={0} max={100}
-                              className="w-20 border rounded px-2 py-1 text-sm text-center"
-                              value={cur.progress ?? 0}
-                              onChange={e=>change(t.id,{ progress: Number(e.target.value) })}
-                            />
-
-                            <button
-                              className="ml-auto text-xs px-2 py-1 rounded border"
-                              onClick={()=>openEditor(t)}
-                            >
-                              เพิ่มใน Google Calendar
-                            </button>
-
-                            <input
-                              type="checkbox"
-                              checked={selected.has(t.id)}
-                              onChange={e=>toggleSel(t.id, e.target.checked)}
-                              title="เลือกงานนี้"
-                            />
-                          </div>
+                      {/* meta */}
+                      <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={cls("rounded-full px-2 py-0.5", PR_CHIP[t.priority])}>{t.priority}</span>
+                          <span className="text-slate-700 dark:text-slate-200">{t.progress ?? 0}%</span>
+                        </div>
+                        <div className="w-full sm:w-auto sm:ml-auto order-last sm:order-none max-w-full sm:max-w-[16rem] text-right">
+                          {t.due_at && <div className="truncate text-slate-600 dark:text-slate-300">กำหนด {fmtDate(t.due_at)}</div>}
+                          {meta.text && <div className={cls("truncate", meta.cls)}>{meta.text}</div>}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
 
-        {/* Editor Modal: Add to Google Calendar */}
-        {editTask && (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="font-semibold">ลงตาราง (Google Calendar)</div>
-                <button className="text-slate-500 hover:text-black" onClick={()=>setEditTask(null)}>✕</button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="md:col-span-2">
-                  <label className="text-sm text-slate-600">Calendar ID (เช่น primary หรือ your@domain.com)</label>
-                  <input
-                    className="mt-1 w-full border rounded px-3 py-2"
-                    placeholder="เช่น primary หรือ your@domain.com"
-                    value={calCalendarId}
-                    onChange={(e) => {
-                      setCalCalendarId(e.target.value);
-                      safeSet(LS_CAL_ID, e.target.value); // ✅ จำเฉพาะ Calendar ID
-                    }}
-                  />
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    * ระบบจะใช้ Service Account สร้าง Event ในปฏิทินนี้ (ต้องแชร์สิทธิ์ให้ Service Account: “Make changes to events”)
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm text-slate-600">ชื่อเหตุการณ์</label>
-                  <input className="mt-1 w-full border rounded px-3 py-2"
-                    value={editTask.title || ""}
-                    onChange={e => setEditTask(et => et ? { ...et, title: e.target.value } : et)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-slate-600">วันกำหนดส่ง (อ้างอิง)</label>
-                  <input className="mt-1 w-full border rounded px-3 py-2" type="date"
-                    value={fmtDate(editTask.due_at)}
-                    onChange={e => setEditTask(et => et ? { ...et, due_at: e.target.value || null } : et)}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm text-slate-600">รายละเอียด</label>
-                  <textarea className="mt-1 w-full border rounded px-3 py-2" rows={3}
-                    value={editTask.description ?? ""}
-                    onChange={e => setEditTask(et => et ? { ...et, description: e.target.value } : et)}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <button className="px-3 py-2 rounded border" onClick={()=>setEditTask(null)}>ปิด</button>
-                <button className="px-3 py-2 rounded bg-emerald-600 text-white" onClick={addToCalendar}>
-                  เพิ่มใน Google Calendar
-                </button>
+                      {/* progress bar */}
+                      <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className={cls("h-full rounded-full bg-gradient-to-r", PROGRESS_BAR[t.status])}
+                          style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }}
+                        />
+                      </div>
+                    </article>
+                  );
+                })}
+                {columns[s].length === 0 && (
+                  <div className="text-xs text-slate-500 dark:text-slate-400 italic">(ลากการ์ดมาวางที่นี่)</div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </main>
+
+      {/* Modal: Progress Editor + Add to Calendar */}
+      {editTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditor} />
+          <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">จัดการงาน</div>
+                <div className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2">{editTask.title}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">code {editTask.code}</div>
+              </div>
+              <button onClick={closeEditor} className="rounded-full px-2 py-1 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close">✕</button>
+            </div>
+
+            {/* Progress */}
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ปรับความคืบหน้า</div>
+              <input
+                type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))}
+                className="w-full accent-emerald-600"
+              />
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <div className="text-slate-700 dark:text-slate-200">{progressDraft}%</div>
+                <input
+                  type="number" min={0} max={100} value={progressDraft}
+                  onChange={(e) => setProgressDraft(Math.max(0, Math.min(100, Number(e.target.value))))}
+                  className="w-20 border border-slate-200 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            {/* Add to Calendar */}
+            <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
+              <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar)</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* ❌ เดิม: อีเมลปฏิทิน (เชิญเข้าร่วม)
+                    ✅ ใหม่: Calendar ID */}
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600 dark:text-slate-300">Calendar ID (เช่น primary หรือ someone@domain)</label>
+                  <input
+                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    placeholder="เช่น primary หรือ your@domain.com"
+                    value={calCalendarId}
+                    onChange={(e) => setCalCalendarId(e.target.value)}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600 dark:text-slate-300">ชื่อเหตุการณ์</label>
+                  <input
+                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    value={calTitle} onChange={(e) => setCalTitle(e.target.value)}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600 dark:text-slate-300">รายละเอียด</label>
+                  <textarea
+                    rows={2}
+                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    value={calDesc} onChange={(e) => setCalDesc(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 dark:text-slate-300">วันที่</label>
+                  <input
+                    type="date"
+                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    value={calDate} onChange={(e) => setCalDate(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-600 dark:text-slate-300">เริ่ม</label>
+                    <input
+                      type="time"
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calStart} onChange={(e) => setCalStart(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-600 dark:text-slate-300">สิ้นสุด</label>
+                    <input
+                      type="time"
+                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      value={calEnd} onChange={(e) => setCalEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600 dark:text-slate-300">สถานที่ (ถ้ามี)</label>
+                  <input
+                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    placeholder="ห้องประชุม / ลิงก์ประชุม ฯลฯ" value={calLocation} onChange={(e) => setCalLocation(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-2 overflow-x-auto">
+                <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                  <button onClick={saveProgress} className="px-3 py-2 rounded-md bg-emerald-600 text-white">บันทึกความคืบหน้า</button>
+                  <button onClick={addToCalendarServer} className="px-3 py-2 rounded-md bg-emerald-600 text-white">เพิ่มใน Google Calendar</button>
+                </div>
+              </div>
+
+              <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                * ระบบจะใช้ Service Account บันทึก Event ลง Calendar ID ที่ระบุโดยตรง (ต้องแชร์สิทธิ์ให้ Service Account เขียนได้)
+              </div>
+            </div>
+
+            {/* Footer actions */}
+            <div className="mt-4 flex items-center justify-between">
+              <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ทำเสร็จ (100%)</button>
+              <button onClick={closeEditor} className="px-3 py-2 rounded-md bg-white border">ปิด</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
