@@ -248,7 +248,7 @@ export default function KanbanPage() {
   const [progressDraft, setProgressDraft] = useState<number>(0);
 
   // calendar template fields
-  const [calEmail, setCalEmail] = useState("");
+  const [calCalendarId, setCalCalendarId] = useState("");
   const [calTitle, setCalTitle] = useState("");
   const [calDesc, setCalDesc] = useState("");
   const [calLocation, setCalLocation] = useState("");
@@ -424,31 +424,41 @@ export default function KanbanPage() {
     }
   }
 
+
   /** ===== Add to Calendar (server) ===== */
   async function addToCalendarServer() {
     const t = editTask;
     if (!t) return;
     if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
+    if (!calCalendarId.trim()) { alert("กรุณากรอก Calendar ID"); return; }
+
     const body = {
+      calendarId: calCalendarId.trim(),          // <- ใช้ Calendar ID ที่กำหนด
       title: calTitle || t.title,
       description: calDesc || t.description || "",
       location: calLocation || "",
-      date: calDate, start: calStart, end: calEnd,
-      attendeeEmail: (calEmail || undefined) as string | undefined,
+      date: calDate,
+      start: calStart,
+      end: calEnd,
     };
+
     try {
-      const r = await fetch("/api/calendar/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch("/api/calendar/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
       alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
     } catch (e: any) {
       console.error("ADD_CAL_ERR", e?.message || e);
-      alert("ลงตารางไม่สำเร็จ — ตรวจสิทธิ์แชร์ปฏิทิน, CALENDAR_ID, และ ENV อีกครั้ง");
+      alert("ลงตารางไม่สำเร็จ — ตรวจสิทธิ์แชร์ปฏิทิน, บทบาท Service Account และ ENV อีกครั้ง");
     }
   }
 
   /** ========= Render ========= */
-  return (
+ return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 dark:text-slate-100">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/85 dark:bg-slate-900/85 backdrop-blur border-b border-slate-200 dark:border-slate-700">
@@ -651,13 +661,18 @@ export default function KanbanPage() {
             <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
               <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar)</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* ❌ เดิม: อีเมลปฏิทิน (เชิญเข้าร่วม)
+                    ✅ ใหม่: Calendar ID */}
                 <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">อีเมลปฏิทิน (เชิญเข้าร่วม)</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-300">Calendar ID (เช่น primary หรือ someone@domain)</label>
                   <input
                     className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    placeholder="name@example.com" value={calEmail} onChange={(e) => setCalEmail(e.target.value)}
+                    placeholder="เช่น primary หรือ your@domain.com"
+                    value={calCalendarId}
+                    onChange={(e) => setCalCalendarId(e.target.value)}
                   />
                 </div>
+
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-600 dark:text-slate-300">ชื่อเหตุการณ์</label>
                   <input
@@ -710,31 +725,24 @@ export default function KanbanPage() {
 
               <div className="mt-2 overflow-x-auto">
                 <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                  <button onClick={saveProgress} className={btn("primary")}>บันทึกความคืบหน้า</button>
-                  <button onClick={addToCalendarServer} className={btn("primary")}>เพิ่มใน Google Calendar</button>
+                  <button onClick={saveProgress} className="px-3 py-2 rounded-md bg-emerald-600 text-white">บันทึกความคืบหน้า</button>
+                  <button onClick={addToCalendarServer} className="px-3 py-2 rounded-md bg-emerald-600 text-white">เพิ่มใน Google Calendar</button>
                 </div>
               </div>
 
               <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                * ระบบจะเปิดหน้า Google Calendar พร้อมกรอกข้อมูลให้ และเชิญอีเมลที่ระบุเป็นผู้เข้าร่วม
-                หากต้องการให้บันทึกลง “ปฏิทินของอีเมลนั้นโดยอัตโนมัติ” ต้องทำ OAuth ฝั่งเซิร์ฟเวอร์เพิ่มเติม
+                * ระบบจะใช้ Service Account บันทึก Event ลง Calendar ID ที่ระบุโดยตรง (ต้องแชร์สิทธิ์ให้ Service Account เขียนได้)
               </div>
             </div>
 
-            {/* Footer actions (ตัวอย่าง: ปิดงาน) */}
+            {/* Footer actions */}
             <div className="mt-4 flex items-center justify-between">
-              <button onClick={markDone} className={btn("primary")}>ทำเสร็จ (100%)</button>
-              <button onClick={closeEditor} className={btn("ghost")}>ปิด</button>
+              <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ทำเสร็จ (100%)</button>
+              <button onClick={closeEditor} className="px-3 py-2 rounded-md bg-white border">ปิด</button>
             </div>
           </div>
         </div>
       )}
-
-      <footer className="mt-8 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-        <div className="mx-auto max-w-screen-xl px-4 py-4 text-slate-500 dark:text-slate-400 text-sm">
-          © 2025 mdes-task-bot. All rights reserved.
-        </div>
-      </footer>
     </div>
   );
 }
