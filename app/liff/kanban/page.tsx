@@ -425,27 +425,36 @@ export default function KanbanPage() {
   }
 
   /** ===== Add to Calendar (server) ===== */
-  async function addToCalendarServer() {
-    const t = editTask;
-    if (!t) return;
-    if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
-    const body = {
-      title: calTitle || t.title,
-      description: calDesc || t.description || "",
-      location: calLocation || "",
-      date: calDate, start: calStart, end: calEnd,
-      attendeeEmail: (calEmail || undefined) as string | undefined,
-    };
-    try {
-      const r = await fetch("/api/calendar/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!r.ok) throw new Error(await r.text());
-      const j = await r.json();
-      alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
-    } catch (e: any) {
-      console.error("ADD_CAL_ERR", e?.message || e);
-      alert("ลงตารางไม่สำเร็จ — ตรวจสิทธิ์แชร์ปฏิทิน, CALENDAR_ID, และ ENV อีกครั้ง");
-    }
+async function addToCalendarServer() {
+  const t = editTask;
+  if (!t) return;
+  if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
+  if (!calEmail.trim()) { alert("กรุณากรอกอีเมลปฏิทิน (เชิญเข้าร่วม) ก่อน"); return; }
+
+  const body = {
+    title: calTitle || t.title,
+    description: calDesc || t.description || "",
+    location: calLocation || "",
+    date: calDate,
+    start: calStart,
+    end: calEnd,
+    attendeeEmail: calEmail.trim(), // ✅ ใช้เมลนี้เป็น calendarId ปลายทาง
+  };
+
+  const r = await fetch("/api/calendar/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+
+  if (!r.ok) {
+    alert(j?.error || (await r.text()) || "ลงตารางไม่สำเร็จ");
+    return;
   }
+  alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
+}
+
 
   /** ========= Render ========= */
   return (
@@ -652,7 +661,7 @@ export default function KanbanPage() {
               <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar)</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">อีเมลปฏิทิน (เชิญเข้าร่วม)</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-300">อีเมลปฏิทิน ที่ลงตาราง</label>
                   <input
                     className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     placeholder="name@example.com" value={calEmail} onChange={(e) => setCalEmail(e.target.value)}
