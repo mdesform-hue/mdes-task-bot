@@ -792,6 +792,61 @@ export default function LiffAdminPage() {
           </button>
         </div>
 
+         {/* Calendar Settings */}
+        <div className="mt-6 p-4 border rounded-lg bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
+          <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Calendar #1 ID</label>
+              <input
+                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
+                value={cal1Id}
+                onChange={(e) => setCal1Id(e.target.value)}
+                placeholder="calendarId 1"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Tag เวลา import</label>
+              <input
+                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
+                value={cal1Tag}
+                onChange={(e) => setCal1Tag(e.target.value)}
+                placeholder="เช่น CAL1"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Calendar #2 ID</label>
+              <input
+                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
+                value={cal2Id}
+                onChange={(e) => setCal2Id(e.target.value)}
+                placeholder="calendarId 2 (ถ้ามี)"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Tag เวลา import</label>
+              <input
+                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
+                value={cal2Tag}
+                onChange={(e) => setCal2Tag(e.target.value)}
+                placeholder="เช่น CAL2"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
+              บันทึก Calendar IDs
+            </button>
+            <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
+              ซิงค์จาก Google Calendar ตอนนี้
+            </button>
+          </div>
+
+          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
+          </div>
+        </div>
         {/* Mobile cards */}
         <div className="space-y-3 md:hidden">
           {items.map((t) => {
@@ -1055,61 +1110,6 @@ export default function LiffAdminPage() {
           </table>
         </div>
 
-        {/* Calendar Settings */}
-        <div className="mt-6 p-4 border rounded-lg bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
-          <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-slate-600 dark:text-slate-300">Calendar #1 ID</label>
-              <input
-                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
-                value={cal1Id}
-                onChange={(e) => setCal1Id(e.target.value)}
-                placeholder="calendarId 1"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-slate-600 dark:text-slate-300">Tag เวลา import</label>
-              <input
-                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
-                value={cal1Tag}
-                onChange={(e) => setCal1Tag(e.target.value)}
-                placeholder="เช่น CAL1"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-slate-600 dark:text-slate-300">Calendar #2 ID</label>
-              <input
-                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
-                value={cal2Id}
-                onChange={(e) => setCal2Id(e.target.value)}
-                placeholder="calendarId 2 (ถ้ามี)"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-slate-600 dark:text-slate-300">Tag เวลา import</label>
-              <input
-                className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
-                value={cal2Tag}
-                onChange={(e) => setCal2Tag(e.target.value)}
-                placeholder="เช่น CAL2"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
-              บันทึก Calendar IDs
-            </button>
-            <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
-              ซิงค์จาก Google Calendar ตอนนี้
-            </button>
-          </div>
-
-          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
-          </div>
-        </div>
 
         {/* Calendar (Monthly) */}
         <div className="mt-8">
