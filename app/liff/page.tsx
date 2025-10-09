@@ -1,8 +1,9 @@
-// app/liff/page.ts
+// app/liff/page.tsx
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import Script from "next/script";
 
+/** ===== Types ===== */
 type Task = {
   id: string;
   code: string;
@@ -18,9 +19,11 @@ type Task = {
   updated_at: string;
 };
 
+/** ===== Consts ===== */
 const STATUS = ["todo","in_progress","blocked","done","cancelled"] as const;
 const PRIORITIES = ["low","medium","high","urgent"] as const;
 const WEEKDAY_TH = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."]; // เริ่ม จันทร์
+const THEME_KEY = "taskbot_theme"; // 'dark' | 'light'
 
 // keys กลาง + สำรอง (ให้สองหน้าคุยกันรู้เรื่อง)
 const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];  // groupId
@@ -32,7 +35,7 @@ const readFirst = (keys: string[]): string => {
 };
 const writeAll = (keys: string[], value: string) => { try { keys.forEach(k => localStorage.setItem(k, value)); } catch {} };
 
-// helpers
+/** ===== helpers ===== */
 const tagsToStr = (tags: string[] | null | undefined) => (tags ?? []).join(", ");
 const parseTags = (s: string) => (s ?? "").split(",").map(x=>x.trim()).filter(Boolean);
 const fmtDate = (iso: string | null) =>
@@ -65,7 +68,7 @@ function toCanonTag(label: string): string {
 // ป้ายแท็กปกติ (ตาราง/การ์ด)
 const TagBadge: React.FC<{ label: string }> = ({ label }) => {
   const key = toCanonTag(label);
-  const cls = TAG_COLORS[key] || "bg-gray-200 text-gray-700 border-gray-300";
+  const cls = TAG_COLORS[key] || "bg-gray-200 text-gray-700 border-gray-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600";
   const showLabel = TAG_LABELS[key] || label;
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-sm ${cls}`}>
@@ -77,7 +80,7 @@ const TagBadge: React.FC<{ label: string }> = ({ label }) => {
 // ป้ายแท็กเล็ก (ในปฏิทิน)
 const TagChip: React.FC<{ label: string }> = ({ label }) => {
   const key = toCanonTag(label);
-  const cls = TAG_COLORS[key] || "bg-gray-200 text-gray-700 border-gray-300";
+  const cls = TAG_COLORS[key] || "bg-gray-200 text-gray-700 border-gray-300 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600";
   const showLabel = TAG_LABELS[key] || label;
   return (
     <span className={`inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold border shadow-sm ${cls}`}>
@@ -86,8 +89,44 @@ const TagChip: React.FC<{ label: string }> = ({ label }) => {
   );
 };
 
+/** ===== Main Page ===== */
 export default function LiffAdminPage() {
-  // state สำหรับ calendar config (—> ย้ายไว้ที่เดียว ไม่ซ้ำซ้อน)
+  // ===== Theme state =====
+  const [isDark, setIsDark] = useState(false);
+  // apply theme helper
+  const applyTheme = (dark: boolean) => {
+    const root = document.documentElement;
+    if (dark) root.classList.add("dark"); else root.classList.remove("dark");
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch {}
+  };
+  // boot theme
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "dark" || saved === "light") {
+        setIsDark(saved === "dark");
+        applyTheme(saved === "dark");
+      } else {
+        // ถ้าไม่มีค่า ให้ยึดตามระบบ
+        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+        setIsDark(prefersDark);
+        applyTheme(prefersDark);
+      }
+    } catch {
+      // fallback: light
+      setIsDark(false);
+      applyTheme(false);
+    }
+  }, []);
+  const toggleTheme = () => {
+    setIsDark(d => {
+      const next = !d;
+      applyTheme(next);
+      return next;
+    });
+  };
+
+  // ===== Core states =====
   const [cal1Id, setCal1Id] = useState("");
   const [cal1Tag, setCal1Tag] = useState("CAL1");
   const [cal2Id, setCal2Id] = useState("");
@@ -282,8 +321,6 @@ export default function LiffAdminPage() {
   const saveRow = async (id: string, extra?: Partial<Task>) => {
     const body = { ...(draft[id] || {}), ...(extra || {}) };
     if (!Object.keys(body).length) return;
-
-    // optimistic UI
     setItems(prev => prev.map(x => x.id === id ? ({ ...x, ...body }) as Task : x));
     markSaving(id, true);
 
@@ -309,7 +346,6 @@ export default function LiffAdminPage() {
 
   const delRow = async (id: string) => {
     if (!confirm("ลบงานนี้?")) return;
-    // optimistic remove
     setItems(prev => prev.filter(x => x.id !== id));
     try {
       const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" });
@@ -349,7 +385,6 @@ export default function LiffAdminPage() {
   const [bulkDue, setBulkDue] = useState<string>("");
   const bulkApplyStatus = async () => {
     if (!selected.size) return;
-    // optimistic
     setItems(prev => prev.map(x => selected.has(x.id) ? ({ ...x, status: bulkStatus }) as Task : x));
     await Promise.all(Array.from(selected).map(id =>
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
@@ -357,11 +392,9 @@ export default function LiffAdminPage() {
       })
     ));
     await load();
-    showToast({ type: "ok", text: "อัปเดตสถานะแล้ว" });
   };
   const bulkApplyDue = async () => {
     if (!selected.size || !bulkDue) return;
-    // optimistic
     setItems(prev => prev.map(x => selected.has(x.id) ? ({ ...x, due_at: bulkDue }) as Task : x));
     await Promise.all(Array.from(selected).map(id =>
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
@@ -369,19 +402,16 @@ export default function LiffAdminPage() {
       })
     ));
     await load();
-    showToast({ type: "ok", text: "อัปเดตกำหนดส่งแล้ว" });
   };
   const bulkDelete = async () => {
     if (!selected.size) return;
     if (!confirm(`ลบ ${selected.size} งาน?`)) return;
-    // optimistic
     const ids = new Set(selected);
     setItems(prev => prev.filter(x => !ids.has(x.id)));
     await Promise.all(Array.from(selected).map(id =>
       fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, { method: "DELETE" })
     ));
     await load();
-    showToast({ type: "ok", text: "ลบงานที่เลือกแล้ว" });
   };
 
   const saveGid = () => { writeAll(GID_KEYS, groupId); setEditGid(false); load(); };
@@ -401,15 +431,14 @@ export default function LiffAdminPage() {
   const offsetMon = (firstOfMonth.getDay() + 6) % 7;
   const gridStart = new Date(y, m, 1 - offsetMon);
 
-  // ✅ ทำให้ dependency ชัดเจน: เปลี่ยนตามเดือน/ปีเท่านั้น
   const daysGrid: Date[] = useMemo(() => {
     const arr: Date[] = [];
     for (let i = 0; i < 42; i++) {
       arr.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
     }
     return arr;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [y, m, gridStart.getDate()]); // gridStart ขยับเมื่อ y/m เปลี่ยนอยู่แล้ว
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [y, m, gridStart.getDate()]);
 
   const keyFromDate = (d: Date) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
@@ -435,8 +464,13 @@ export default function LiffAdminPage() {
   const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(firstOfMonth);
   const todayKey = keyFromDate(new Date());
 
+  // ===== Shared class presets for inputs =====
+  const clsInput = "border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100 dark:disabled:bg-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100";
+  const clsBtnBorder = "px-3 py-2 rounded border dark:border-slate-600 dark:text-slate-100";
+  const clsCard = "rounded-2xl border shadow-sm p-3 bg-white dark:bg-slate-800 dark:border-slate-700";
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       {/* Toast */}
       {toast && (
         <div className={`fixed top-3 right-3 z-[60] px-3 py-2 rounded shadow text-sm
@@ -446,17 +480,29 @@ export default function LiffAdminPage() {
       )}
 
       {/* Global header */}
-      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-slate-200">
+      <header className="sticky top-0 z-50 bg-white/85 dark:bg-slate-900/85 backdrop-blur border-b border-slate-200 dark:border-slate-700">
         <div className="w-full px-4 md:px-8 h-14 flex items-center gap-4">
-          <div className="font-semibold text-slate-800">mdes-task-bot — LIFF Admin</div>
-          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm text-slate-600">
-            <a className="text-slate-900 border-b-2 border-emerald-500" href="/liff">Tasks</a>
-            <a className="hover:text-slate-900" href="/liff/kanban">Kanban</a>
-            <a className="hover:text-slate-900" href="/liff/dashboard">Dashboard</a>
+          <div className="font-semibold">mdes-task-bot — LIFF Admin</div>
+
+          <nav className="ml-auto hidden md:flex items-center gap-5 text-sm">
+            <a className="text-slate-900 dark:text-slate-100 border-b-2 border-emerald-500" href="/liff">Tasks</a>
+            <a className="hover:text-slate-900 dark:hover:text-white" href="/liff/kanban">Kanban</a>
+            <a className="hover:text-slate-900 dark:hover:text-white" href="/liff/dashboard">Dashboard</a>
           </nav>
+
+          {/* Dark mode toggle */}
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle dark mode"
+            className="ml-2 inline-flex items-center justify-center rounded px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title={isDark ? "เปลี่ยนเป็น Light mode" : "เปลี่ยนเป็น Dark mode"}
+          >
+            {isDark ? "🌙 Dark" : "☀️ Light"}
+          </button>
+
           <a
             href="/liff/kanban"
-            className="md:hidden ml-auto inline-flex items-center justify-center rounded px-3 py-2 bg-green-600 text-white"
+            className="md:hidden ml-2 inline-flex items-center justify-center rounded px-3 py-2 bg-green-600 text-white"
           >
             Kanban
           </a>
@@ -469,39 +515,39 @@ export default function LiffAdminPage() {
 
         {/* Title */}
         <div className="mb-5 md:mb-7">
-          <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Tasks</h1>
-          <p className="text-slate-600 text-sm">จัดการงานของกลุ่ม</p>
+          <h1 className="text-xl md:text-2xl font-semibold">Tasks</h1>
+          <p className="text-slate-600 dark:text-slate-300 text-sm">จัดการงานของกลุ่ม</p>
         </div>
 
         {/* ===== Toolbar ===== */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-3 md:mb-4">
           <div className="flex flex-col">
-            <label className="text-sm mb-1">Group ID</label>
+            <label className="text-sm mb-1 text-slate-700 dark:text-slate-300">Group ID</label>
             <div className="flex gap-2">
-              <input className="border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100" value={groupId} disabled={!editGid} onChange={e=>setGroupId(e.target.value)} />
+              <input className={clsInput} value={groupId} disabled={!editGid} onChange={e=>setGroupId(e.target.value)} />
               {!editGid
-                ? <button className="px-3 py-3 md:py-2 rounded border" onClick={()=>setEditGid(true)}>เปลี่ยน</button>
-                : <button className="px-3 py-3 md:py-2 rounded bg-blue-600 text-white" onClick={saveGid}>บันทึก</button>}
+                ? <button className={clsBtnBorder} onClick={()=>setEditGid(true)}>เปลี่ยน</button>
+                : <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={saveGid}>บันทึก</button>}
             </div>
           </div>
 
           <div className="flex flex-col">
-            <label className="text-sm mb-1">Admin Key</label>
+            <label className="text-sm mb-1 text-slate-700 dark:text-slate-300">Admin Key</label>
             <div className="flex gap-2">
-              <input className="border px-3 py-3 md:py-2 rounded w-full disabled:bg-gray-100" value={adminKey} disabled={!editKey} onChange={e=>setAdminKey(e.target.value)} />
+              <input className={clsInput} value={adminKey} disabled={!editKey} onChange={e=>setAdminKey(e.target.value)} />
               {!editKey
-                ? <button className="px-3 py-3 md:py-2 rounded border" onClick={()=>setEditKey(true)}>เปลี่ยน</button>
-                : <button className="px-3 py-3 md:py-2 rounded bg-blue-600 text-white" onClick={saveKey}>บันทึก</button>}
+                ? <button className={clsBtnBorder} onClick={()=>setEditKey(true)}>เปลี่ยน</button>
+                : <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={saveKey}>บันทึก</button>}
             </div>
           </div>
 
           <div className="flex flex-col">
-            <label className="text-sm mb-1">ค้นหา</label>
+            <label className="text-sm mb-1 text-slate-700 dark:text-slate-300">ค้นหา</label>
             <div className="flex gap-2">
-              <input className="border px-3 py-3 md:py-2 rounded w-full" value={q} onChange={e=>setQ(e.target.value)} />
-              <button className="bg-black text-white px-3 py-3 md:py-2 rounded" onClick={load}>รีเฟรช</button>
+              <input className={clsInput} value={q} onChange={e=>setQ(e.target.value)} />
+              <button className="bg-black text-white px-3 py-2 rounded dark:bg-slate-700" onClick={load}>รีเฟรช</button>
               <button
-                className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-3 md:py-2 rounded"
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded"
                 onClick={() => {
                   const url = new URL("/liff/kanban", location.origin);
                   if (groupId) url.searchParams.set("group_id", groupId);
@@ -512,7 +558,7 @@ export default function LiffAdminPage() {
                 เปิด Kanban
               </button>
               <button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-3 md:py-2 rounded"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded"
                 onClick={() => {
                   const url = new URL("/liff/dashboard", location.origin);
                   if (groupId) url.searchParams.set("group_id", groupId);
@@ -526,19 +572,18 @@ export default function LiffAdminPage() {
           </div>
         </div>
 
-        {/* ===== Bulk actions bar (show when any rows selected) ===== */}
+        {/* ===== Bulk actions bar ===== */}
         {selected.size > 0 && (
-          <div className="sticky top-14 z-40 mb-4 rounded-lg border bg-amber-50 text-slate-800 px-3 py-2">
+          <div className="sticky top-14 z-40 mb-4 rounded-lg border bg-amber-50 text-slate-800 px-3 py-2 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">
                 เลือกแล้ว {selected.size} งาน
               </span>
 
-              {/* เปลี่ยนสถานะรวดเดียว */}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-slate-600">สถานะ</label>
+                <label className="text-sm text-slate-600 dark:text-slate-300">สถานะ</label>
                 <select
-                  className="border rounded px-2 py-1 text-sm"
+                  className="border rounded px-2 py-1 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                   value={bulkStatus}
                   onChange={(e) => setBulkStatus(e.target.value as Task["status"])}
                 >
@@ -552,12 +597,11 @@ export default function LiffAdminPage() {
                 </button>
               </div>
 
-              {/* ตั้ง due date รวดเดียว */}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-slate-600">กำหนดส่ง</label>
+                <label className="text-sm text-slate-600 dark:text-slate-300">กำหนดส่ง</label>
                 <input
                   type="date"
-                  className="border rounded px-2 py-1 text-sm"
+                  className="border rounded px-2 py-1 text-sm dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                   value={bulkDue}
                   onChange={(e) => setBulkDue(e.target.value)}
                 />
@@ -569,7 +613,6 @@ export default function LiffAdminPage() {
                 </button>
               </div>
 
-              {/* ลบที่เลือก */}
               <div className="ml-auto flex items-center gap-2">
                 <button
                   className="px-3 py-1.5 rounded bg-red-600 text-white text-sm"
@@ -578,7 +621,7 @@ export default function LiffAdminPage() {
                   ลบที่เลือก
                 </button>
                 <button
-                  className="px-3 py-1.5 rounded border text-sm"
+                  className={clsBtnBorder}
                   onClick={clearSel}
                 >
                   ยกเลิกเลือก
@@ -590,25 +633,60 @@ export default function LiffAdminPage() {
 
         {/* ===== Create row ===== */}
         <div className="mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
-          <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="ชื่องานใหม่"
+          <input className={`md:col-span-3 ${clsInput}`} placeholder="ชื่องานใหม่"
                  value={creating.title ?? ""} onChange={e=>setCreating(c=>({...c, title:e.target.value}))}/>
-          <input className="md:col-span-3 border px-3 py-3 md:py-2 rounded" placeholder="รายละเอียด"
+          <input className={`md:col-span-3 ${clsInput}`} placeholder="รายละเอียด"
                  value={creating.description ?? ""} onChange={e=>setCreating(c=>({...c, description:e.target.value}))}/>
-          <select className="md:col-span-2 border px-3 py-3 md:py-2 rounded"
+          <select className={`md:col-span-2 ${clsInput}`}
                   value={(creating.priority as Task["priority"]) ?? "medium"}
                   onChange={e=>setCreating(c=>({...c, priority: e.target.value as Task["priority"]}))}>
             {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" placeholder="tags (comma)"
+          <input className={`md:col-span-2 ${clsInput}`} placeholder="tags (comma)"
                  value={Array.isArray(creating.tags)? creating.tags.join(", ") : (creating.tags as any || "")}
                  onChange={e=>setCreating(c=>({...c, tags: parseTags(e.target.value)}))}/>
-          <input className="md:col-span-2 border px-3 py-3 md:py-2 rounded" type="date"
+          <input className={`md:col-span-2 ${clsInput}`} type="date"
                  value={creating.due_at ? fmtDate(creating.due_at) : ""}
                  onChange={e=>setCreating(c=>({...c, due_at: e.target.value || null}))}/>
           <button className="md:col-span-12 bg-green-600 text-white px-4 py-3 md:py-2 rounded" onClick={createRow}>+ Add</button>
         </div>
 
-        {/* ===== Mobile: Cards (controlled) ===== */}
+              {/* ===== Calendar Settings ===== */}
+        <div className="mt-6 p-4 border rounded-lg bg-slate-50 dark:bg-slate-800 dark:border-slate-700">
+          <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Calendar #1 ID (เช่น primary หรือ you@domain)</label>
+              <input className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100" value={cal1Id} onChange={e=>setCal1Id(e.target.value)} placeholder="calendarId 1" />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Tag เวลา import</label>
+              <input className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100" value={cal1Tag} onChange={e=>setCal1Tag(e.target.value)} placeholder="เช่น CAL1" />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Calendar #2 ID</label>
+              <input className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100" value={cal2Id} onChange={e=>setCal2Id(e.target.value)} placeholder="calendarId 2 (ถ้ามี)" />
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 dark:text-slate-300">Tag เวลา import</label>
+              <input className="mt-1 w-full border rounded px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100" value={cal2Tag} onChange={e=>setCal2Tag(e.target.value)} placeholder="เช่น CAL2" />
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
+              บันทึก Calendar IDs
+            </button>
+            <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
+              ซิงค์จาก Google Calendar ตอนนี้
+            </button>
+          </div>
+
+          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
+          </div>
+        </div>  
+        {/* ===== Mobile: Cards ===== */}
         <div className="space-y-3 md:hidden">
           {items.map(t => {
             const d = draft[t.id] || {};
@@ -616,39 +694,38 @@ export default function LiffAdminPage() {
             const isSaving = savingIds.has(t.id);
 
             return (
-              <div key={t.id} className="rounded-2xl border shadow-sm p-3">
+              <div key={t.id} className={clsCard}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
-                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{t.code}</span>
+                    <span className="text-xs font-mono bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded">{t.code}</span>
                   </div>
-                  {/* ✅ แสดง badge tag ด้านขวา */}
                   <div className="flex flex-wrap gap-1">
                     {(cur.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
                   </div>
                 </div>
 
-                <label className="text-xs text-gray-600">Title</label>
-                <input className="border rounded w-full px-3 py-2 mb-2"
+                <label className="text-xs text-gray-600 dark:text-slate-300">Title</label>
+                <input className={`border rounded w-full px-3 py-2 mb-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100`}
                        value={cur.title}
                        onChange={e=>change(t.id,{ title:e.target.value })}/>
 
-                <label className="text-xs text-gray-600">Desc</label>
-                <textarea className="border rounded w-full px-3 py-2 mb-2"
+                <label className="text-xs text-gray-600 dark:text-slate-300">Desc</label>
+                <textarea className="border rounded w-full px-3 py-2 mb-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                           rows={2}
                           value={cur.description ?? ""}
                           onChange={e=>change(t.id,{ description:e.target.value })}/>
 
                 <div className="grid grid-cols-2 gap-3 mb-2">
                   <div>
-                    <label className="text-xs text-gray-600">Due</label>
-                    <input className="border rounded w-full px-3 py-2" type="date"
+                    <label className="text-xs text-gray-600 dark:text-slate-300">Due</label>
+                    <input className="border rounded w-full px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100" type="date"
                            value={fmtDate(cur.due_at)}
                            onChange={e=>change(t.id,{ due_at: e.target.value || null })}/>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-600">Status</label>
-                    <select className="border rounded w-full px-3 py-2"
+                    <label className="text-xs text-gray-600 dark:text-slate-300">Status</label>
+                    <select className="border rounded w-full px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                             value={cur.status}
                             onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}>
                       {STATUS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -658,36 +735,60 @@ export default function LiffAdminPage() {
 
                 <div className="grid grid-cols-2 gap-3 mb-2">
                   <div>
-                    <label className="text-xs text-gray-600">Priority</label>
-                    <select className="border rounded w-full px-3 py-2"
+                    <label className="text-xs text-gray-600 dark:text-slate-300">Priority</label>
+                    <select className="border rounded w-full px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                             value={cur.priority}
                             onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}>
                       {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-600">Progress: {cur.progress}%</label>
+                    <label className="text-xs text-gray-600 dark:text-slate-300">Progress: {cur.progress}%</label>
                     <input className="w-full" type="range" min={0} max={100}
                            value={cur.progress ?? 0}
                            onChange={e=>change(t.id,{ progress: Number(e.target.value) })}/>
                   </div>
                 </div>
 
-                <label className="text-xs text-gray-600">Tags (comma)</label>
-                <input className="border rounded w-full px-3 py-2"
+                <label className="text-xs text-gray-600 dark:text-slate-300">Tags (comma)</label>
+                <input className="border rounded w-full px-3 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                        value={tagsToStr(cur.tags)}
                        onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}/>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    className="px-3 py-2 bg-blue-600 text-white rounded mr-2 disabled:opacity-60"
+                    disabled={isSaving}
+                    onClick={() => {
+                      setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x) : x));
+                      saveRow(t.id);
+                    }}
+                  >
+                    {isSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    className="px-3 py-2 bg-green-700 text-white rounded mr-2 disabled:opacity-60"
+                    disabled={isSaving}
+                    onClick={() => {
+                      change(t.id, { status: "done", progress: 100 });
+                      setItems(prev => prev.map(x => x.id === t.id ? applyDraftToItem(x, { status: "done", progress: 100 }) : x));
+                      saveRow(t.id, { status: "done", progress: 100 });
+                    }}
+                  >
+                    {isSaving ? "Saving…" : "Done"}
+                  </button>
+                  <button className="px-3 py-2 bg-red-600 text-white rounded" onClick={()=>delRow(t.id)}>Del</button>
+                </div>
               </div>
             );
           })}
-          {!items.length && <div className="text-center text-gray-500 py-8">No tasks</div>}
+          {!items.length && <div className="text-center text-gray-500 dark:text-slate-400 py-8">No tasks</div>}
         </div>
 
-        {/* ===== Desktop: Table (controlled + optimistic) ===== */}
+        {/* ===== Desktop: Table ===== */}
         <div className="overflow-x-auto hidden md:block">
-          {/* ⬇️ ปรับขนาดตัวอักษรและระยะห่าง: text-base + leading-snug, และเพิ่ม padding ในหัว/เซลล์ */}
-          <table className="w-full border text-base leading-snug">
-            <thead className="bg-gray-100 text-slate-800 font-medium">
+          <table className="w-full border text-base leading-snug dark:border-slate-700">
+            <thead className="bg-gray-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-medium">
               <tr>
                 <th className="px-3 py-2.5 text-center w-10">
                   <input type="checkbox" onChange={e=> e.target.checked ? selectAllVisible() : clearSel()} />
@@ -703,23 +804,23 @@ export default function LiffAdminPage() {
                 <th className="px-3 py-2.5">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white dark:bg-slate-900">
               {items.map(t => {
                 const d = draft[t.id] || {};
                 const cur = { ...t, ...d };
                 const isSaving = savingIds.has(t.id);
 
                 return (
-                  <tr key={t.id} className="border-t">
+                  <tr key={t.id} className="border-t dark:border-slate-700">
                     <td className="px-3 py-2.5 text-center">
                       <input type="checkbox" checked={selected.has(t.id)} onChange={e=>toggleSel(t.id, e.target.checked)} />
                     </td>
 
-                    <td className="px-3 py-2.5 font-mono text-slate-800">{t.code}</td>
+                    <td className="px-3 py-2.5 font-mono text-slate-800 dark:text-slate-100">{t.code}</td>
 
                     <td className="px-3 py-2.5">
                       <input
-                        className="border px-2 py-2 w-full rounded text-base"
+                        className="border px-2 py-2 w-full rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         value={cur.title}
                         onChange={e=>change(t.id,{ title:e.target.value })}
                       />
@@ -727,7 +828,7 @@ export default function LiffAdminPage() {
 
                     <td className="px-3 py-2.5">
                       <input
-                        className="border px-2 py-2 w-full rounded text-base"
+                        className="border px-2 py-2 w-full rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         value={cur.description ?? ""}
                         onChange={e=>change(t.id,{ description:e.target.value })}
                       />
@@ -735,7 +836,7 @@ export default function LiffAdminPage() {
 
                     <td className="px-3 py-2.5 text-center">
                       <input
-                        className="border px-2 py-2 rounded text-base"
+                        className="border px-2 py-2 rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         type="date"
                         value={fmtDate(cur.due_at)}
                         onChange={e=>change(t.id,{ due_at: e.target.value || null })}
@@ -744,7 +845,7 @@ export default function LiffAdminPage() {
 
                     <td className="px-3 py-2.5 text-center">
                       <select
-                        className="border px-2 py-2 rounded text-base"
+                        className="border px-2 py-2 rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         value={cur.status}
                         onChange={e=>change(t.id,{ status: e.target.value as Task["status"] })}
                       >
@@ -754,7 +855,7 @@ export default function LiffAdminPage() {
 
                     <td className="px-3 py-2.5 text-center">
                       <select
-                        className="border px-2 py-2 rounded text-base"
+                        className="border px-2 py-2 rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         value={cur.priority}
                         onChange={e=>change(t.id,{ priority: e.target.value as Task["priority"] })}
                       >
@@ -763,13 +864,11 @@ export default function LiffAdminPage() {
                     </td>
 
                     <td className="px-3 py-2.5">
-                      {/* ✅ แสดง badge ของทุกแท็ก (ใช้ label ไทยหากเป็น CAL1/CAL2) */}
                       <div className="flex flex-wrap gap-1 mb-1">
                         {(cur.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
                       </div>
-                      {/* ช่องแก้ไขแท็กตามเดิม */}
                       <input
-                        className="border px-2 py-2 w-full rounded text-base"
+                        className="border px-2 py-2 w-full rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         value={tagsToStr(cur.tags)}
                         onChange={e=>change(t.id,{ tags: parseTags(e.target.value) })}
                       />
@@ -777,7 +876,7 @@ export default function LiffAdminPage() {
 
                     <td className="px-3 py-2.5 text-center">
                       <input
-                        className="border px-2 py-2 w-24 text-center rounded text-base"
+                        className="border px-2 py-2 w-24 text-center rounded text-base dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                         type="number" min={0} max={100}
                         value={cur.progress ?? 0}
                         onChange={e=>change(t.id,{ progress: Number(e.target.value) })}
@@ -814,72 +913,38 @@ export default function LiffAdminPage() {
                 );
               })}
               {!items.length && (
-                <tr><td className="p-6 text-center text-gray-500" colSpan={10}>No tasks</td></tr>
+                <tr><td className="p-6 text-center text-gray-500 dark:text-slate-400" colSpan={10}>No tasks</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* ===== Calendar Settings (ต่อกลุ่ม) ===== */}
-        <div className="mt-6 p-4 border rounded-lg bg-slate-50">
-          <div className="font-medium mb-3">Calendar Settings (ต่อกลุ่ม)</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-slate-600">Calendar #1 ID (เช่น primary หรือ you@domain)</label>
-              <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Id} onChange={e=>setCal1Id(e.target.value)} placeholder="calendarId 1" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-600">Tag เวลา import</label>
-              <input className="mt-1 w-full border rounded px-3 py-2" value={cal1Tag} onChange={e=>setCal1Tag(e.target.value)} placeholder="เช่น CAL1" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-600">Calendar #2 ID</label>
-              <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Id} onChange={e=>setCal2Id(e.target.value)} placeholder="calendarId 2 (ถ้ามี)" />
-            </div>
-            <div>
-              <label className="text-sm text-slate-600">Tag เวลา import</label>
-              <input className="mt-1 w-full border rounded px-3 py-2" value={cal2Tag} onChange={e=>setCal2Tag(e.target.value)} placeholder="เช่น CAL2" />
-            </div>
-          </div>
 
-          <div className="mt-3 flex gap-2">
-            <button className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50" onClick={saveCalendarConfig} disabled={cfgLoading}>
-              บันทึก Calendar IDs
-            </button>
-            <button className="px-3 py-2 rounded bg-emerald-600 text-white disabled:opacity-50" onClick={syncNow} disabled={cfgLoading}>
-              ซิงค์จาก Google Calendar ตอนนี้
-            </button>
-          </div>
-
-          <div className="mt-2 text-xs text-slate-500">
-            * ระบบจะจำ calendarId ต่อ “group_id” ไว้ใน DB และใช้งาน Service Account ที่ตั้งค่าไว้ใน ENV ของคุณ
-          </div>
-        </div>
 
         {/* ===== Calendar (Monthly) ===== */}
         <div className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
-              <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>← เดือนก่อน</button>
+              <button className={clsBtnBorder} onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>← เดือนก่อน</button>
               <div className="text-lg font-semibold">{monthLabel}</div>
-              <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>เดือนถัดไป →</button>
+              <button className={clsBtnBorder} onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>เดือนถัดไป →</button>
             </div>
             <div className="flex items-center gap-2">
               <input
                 type="month"
-                className="border rounded px-2 py-2"
+                className="border rounded px-2 py-2 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
                 value={`${monthCursor.getFullYear()}-${String(monthCursor.getMonth()+1).padStart(2,"0")}`}
                 onChange={(e) => {
                   const [yy, mm] = e.target.value.split("-").map(Number);
                   if (yy && mm) setMonthCursor(new Date(yy, mm - 1, 1));
                 }}
               />
-              <button className="px-3 py-2 rounded border" onClick={() => setMonthCursor(new Date())}>วันนี้</button>
+              <button className={clsBtnBorder} onClick={() => setMonthCursor(new Date())}>วันนี้</button>
             </div>
           </div>
 
           {/* weekday header */}
-          <div className="grid grid-cols-7 text-center text-xs text-gray-600 mb-1">
+          <div className="grid grid-cols-7 text-center text-xs text-gray-600 dark:text-slate-300 mb-1">
             {WEEKDAY_TH.map((d) => (<div key={d} className="py-2">{d}</div>))}
           </div>
 
@@ -894,12 +959,13 @@ export default function LiffAdminPage() {
               return (
                 <div key={k} className={[
                   "min-h-[92px] md:min-h-[110px] border rounded p-1 md:p-2 flex flex-col",
-                  inMonth ? "bg-white" : "bg-gray-50 text-gray-400",
-                  isToday ? "ring-2 ring-blue-500" : ""
+                  inMonth ? "bg-white dark:bg-slate-900" : "bg-gray-50 text-gray-400 dark:bg-slate-800 dark:text-slate-500",
+                  isToday ? "ring-2 ring-blue-500" : "",
+                  "border-slate-200 dark:border-slate-700"
                 ].join(" ")}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={"text-xs " + (isToday ? "font-bold text-blue-600" : "")}>{d.getDate()}</span>
-                    {dayTasks.length > 0 && (<span className="text-[10px] text-gray-500">{dayTasks.length} งาน</span>)}
+                    {dayTasks.length > 0 && (<span className="text-[10px] text-gray-500 dark:text-slate-400">{dayTasks.length} งาน</span>)}
                   </div>
                   <div className="space-y-1 overflow-y-auto">
                     {dayTasks.slice(0, 4).map(t => (
@@ -907,28 +973,24 @@ export default function LiffAdminPage() {
                         key={t.id}
                         onClick={() => setSelectedTask(t)}
                         className="w-full text-left text-[13px] md:text-sm px-2 py-1.5 rounded border hover:shadow
-                                   bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-2 font-medium"
+                                   bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700
+                                   border-slate-300 dark:border-slate-600 flex items-center gap-2 font-medium"
                       >
-                        {/* จุดสีเล็ก ๆ สื่อสถานะ (optional) */}
-                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-
-                        {/* ชื่อเรื่อง (truncate) */}
-                       <span className="truncate flex-1">{t.title}</span>
-
-                        {/* แท็กเล็ก ๆ ห้อยด้านขวา (โผล่แค่ 1-2 อัน) */}
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                        <span className="truncate flex-1">{t.title}</span>
                         <span className="flex items-center gap-1 shrink-0">
                           {(t.tags ?? []).slice(0, 2).map(tag => <TagChip key={tag} label={tag} />)}
                         </span>
                       </button>
                     ))}
-                    {dayTasks.length > 4 && (<div className="text-[11px] text-gray-500">+{dayTasks.length - 4} more…</div>)}
+                    {dayTasks.length > 4 && (<div className="text-[11px] text-gray-500 dark:text-slate-400">+{dayTasks.length - 4} more…</div>)}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-3 text-xs text-gray-500">
+          <div className="mt-3 text-xs text-gray-500 dark:text-slate-400">
             แสดงงานตาม <b>due date</b> (เวลาไทย). งานที่ไม่มี due date จะไม่แสดงในปฏิทิน
           </div>
         </div>
@@ -938,15 +1000,15 @@ export default function LiffAdminPage() {
           <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center px-4"
                onClick={() => setSelectedTask(null)}>
             <div
-              className="w-full max-w-lg rounded-2xl bg-white shadow-lg border border-slate-200 p-4 md:p-5"
+              className="w/full max-w-lg rounded-2xl bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 p-4 md:p-5"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-3 mb-3">
-                <h3 className="text-base md:text-lg font-semibold text-slate-900 leading-snug">
+                <h3 className="text-base md:text-lg font-semibold">
                   {selectedTask.title}
                 </h3>
                 <button
-                  className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-100"
                   onClick={() => setSelectedTask(null)}
                 >
                   ปิด
@@ -957,23 +1019,23 @@ export default function LiffAdminPage() {
                 {(selectedTask.tags ?? []).map(tag => <TagBadge key={tag} label={tag} />)}
               </div>
 
-              <dl className="space-y-2 text-sm text-slate-700 mb-3">
+              <dl className="space-y-2 text-sm">
                 <div className="flex">
-                  <dt className="w-24 shrink-0 text-slate-500">กำหนดส่ง</dt>
+                  <dt className="w-24 shrink-0 text-slate-500 dark:text-slate-300">กำหนดส่ง</dt>
                   <dd>{fmtDate(selectedTask.due_at)}</dd>
                 </div>
                 <div className="flex">
-                  <dt className="w-24 shrink-0 text-slate-500">สถานะ</dt>
+                  <dt className="w-24 shrink-0 text-slate-500 dark:text-slate-300">สถานะ</dt>
                   <dd>{selectedTask.status}</dd>
                 </div>
                 <div className="flex">
-                  <dt className="w-24 shrink-0 text-slate-500">ความสำคัญ</dt>
+                  <dt className="w-24 shrink-0 text-slate-500 dark:text-slate-300">ความสำคัญ</dt>
                   <dd>{selectedTask.priority}</dd>
                 </div>
               </dl>
 
               {selectedTask.description && (
-                <div className="text-sm text-slate-800 whitespace-pre-wrap border-t pt-3">
+                <div className="text-sm whitespace-pre-wrap border-t border-slate-200 dark:border-slate-700 pt-3">
                   {selectedTask.description}
                 </div>
               )}
