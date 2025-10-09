@@ -609,10 +609,6 @@ export default function KanbanPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ทำเสร็จ (100%)</button>
-              <button onClick={closeEditor} className="px-3 py-2 rounded-md bg-white border">ปิด</button>
-            </div>
           </div>
         </div>
       )}
