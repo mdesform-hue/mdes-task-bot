@@ -11,31 +11,37 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
       onClick={onToggle}
       aria-label="Toggle dark mode"
       className={[
-        "relative h-8 w-16 rounded-full border overflow-hidden",
+        "relative h-8 w-16 rounded-full border overflow-hidden", // 32×64
         "transition-colors duration-500 ease-out",
         "border-slate-300 dark:border-slate-600",
         bgClass,
         "shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
       ].join(" ")}
     >
+      {/* Day layer */}
       <div className={["absolute inset-0 transition-opacity duration-500", isDark ? "opacity-0" : "opacity-100"].join(" ")}>
         <span className="cloud cloud-1" />
         <span className="cloud cloud-2" />
       </div>
+
+      {/* Night layer */}
       <div className={["absolute inset-0 bg-slate-900 transition-opacity duration-500", isDark ? "opacity-100" : "opacity-0"].join(" ")}>
         {Array.from({ length: 12 }).map((_, i) => (
           <span key={i} className={`star star-${(i % 8) + 1}`} />
         ))}
       </div>
+
+      {/* Knob (sun/moon) */}
       <div
         className={[
-          "absolute top-1 left-1 h-6 w-6 rounded-full",
+          "absolute top-1 left-1 h-6 w-6 rounded-full", // 24px
           "transition-transform duration-500 ease-out",
-          isDark ? "translate-x-[32px]" : "translate-x-0",
+          isDark ? "translate-x-[32px]" : "translate-x-0", // 64 - 24 - 8 = 32
           "bg-yellow-300 dark:bg-slate-100 shadow-md",
           "flex items-center justify-center",
         ].join(" ")}
       >
+        {/* Sun */}
         <svg className={["h-5 w-5 transition-opacity duration-300", isDark ? "opacity-0" : "opacity-100"].join(" ")} viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="4.2" className="fill-yellow-400" />
           <g className="stroke-yellow-400" strokeWidth="1.4" strokeLinecap="round">
@@ -45,31 +51,62 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
             <path d="M19.4 4.6l-1.8 1.8" /><path d="M6.4 17.6l-1.8 1.8" />
           </g>
         </svg>
+        {/* Moon */}
         <svg className={["absolute h-5 w-5 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
           <path d="M16.5 12.5a7 7 0 1 1-5-9.5 6 6 0 1 0 7.7 7.7 7.1 7.1 0 0 1-2.7 1.8z" className="fill-slate-300" />
           <circle cx="10" cy="9" r="0.9" className="fill-slate-400" />
           <circle cx="12.2" cy="12.8" r="0.7" className="fill-slate-400" />
         </svg>
       </div>
+
+      {/* local styles for clouds/stars */}
       <style jsx>{`
-        .cloud{position:absolute;top:12px;height:6px;width:22px;background:#fff;border-radius:999px;box-shadow:11px -5px 0 2px #fff,22px -2px 0 0 #fff;opacity:.85;animation:cloud-move 10s linear infinite}
-        .cloud-1{left:-16px;animation-delay:0s}.cloud-2{left:-32px;top:6px;transform:scale(.8);animation-delay:2s}
-        @keyframes cloud-move{0%{transform:translateX(0)}100%{transform:translateX(95px)}}
-        .star{position:absolute;width:2px;height:2px;background:#fff;border-radius:999px;opacity:.6;animation:twinkle 1.6s ease-in-out infinite}
-        .star-1{top:6px;left:12px;animation-delay:0s}.star-2{top:5px;left:32px;animation-delay:.2s}.star-3{top:16px;left:46px;animation-delay:.4s}.star-4{top:22px;left:18px;animation-delay:.6s}.star-5{top:10px;left:54px;animation-delay:.8s}.star-6{top:26px;left:38px;animation-delay:1s}.star-7{top:18px;left:6px;animation-delay:1.2s}.star-8{top:27px;left:58px;animation-delay:1.4s}
-        @keyframes twinkle{0%,100%{opacity:.2;transform:scale(1)}50%{opacity:.9;transform:scale(1.35)}}
+        .cloud {
+          position: absolute;
+          top: 12px;
+          height: 6px;
+          width: 22px;
+          background: #fff;
+          border-radius: 999px;
+          box-shadow: 11px -5px 0 2px #fff, 22px -2px 0 0 #fff;
+          opacity: 0.85;
+          animation: cloud-move 10s linear infinite;
+        }
+        .cloud-1 { left: -16px; animation-delay: 0s; }
+        .cloud-2 { left: -32px; top: 6px; transform: scale(0.8); animation-delay: 2s; }
+        @keyframes cloud-move { 0% { transform: translateX(0); } 100% { transform: translateX(95px); } }
+
+        .star {
+          position: absolute;
+          width: 2px; height: 2px;
+          background: white; border-radius: 999px; opacity: 0.6;
+          animation: twinkle 1.6s ease-in-out infinite;
+        }
+        .star-1 { top: 6px; left: 12px; animation-delay: 0s; }
+        .star-2 { top: 5px; left: 32px; animation-delay: .2s; }
+        .star-3 { top: 16px; left: 46px; animation-delay: .4s; }
+        .star-4 { top: 22px; left: 18px; animation-delay: .6s; }
+        .star-5 { top: 10px; left: 54px; animation-delay: .8s; }
+        .star-6 { top: 26px; left: 38px; animation-delay: 1.0s; }
+        .star-7 { top: 18px; left: 6px;  animation-delay: 1.2s; }
+        .star-8 { top: 27px; left: 58px; animation-delay: 1.4s; }
+
+        @keyframes twinkle { 0%,100% { opacity: .2; transform: scale(1); } 50% { opacity: .9; transform: scale(1.35); } }
       `}</style>
     </button>
   );
 }
 
-/** ========= Theme helpers ========= */
+/** ========= Theme helpers (white/green clean) ========= */
 const cls = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
 const btn = (variant: "primary" | "ghost" | "danger" = "primary") =>
   ({
-    primary: "px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent transition",
-    ghost: "px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-emerald-400 transition dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600",
-    danger: "px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
+    primary:
+      "px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent transition",
+    ghost:
+      "px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-emerald-400 transition dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600",
+    danger:
+      "px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
   }[variant]);
 
 /** ========= Types ========= */
@@ -140,15 +177,20 @@ const PR_CHIP: Record<Task["priority"], string> = {
 /** ========= Local Storage keys ========= */
 const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];
 const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];
-const THEME_KEY = "taskbot_theme";
+const THEME_KEY = "taskbot_theme"; // shared with LIFF page
 
-/** ========= Utils ========= */
-const readFirst = (keys: string[]): string => { try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {} return ""; };
+const readFirst = (keys: string[]): string => {
+  try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
+  return "";
+};
 const writeAll = (keys: string[], value: string) => { try { keys.forEach((k) => localStorage.setItem(k, value)); } catch {} };
 
+/** ========= Utils ========= */
 function fmtDate(v?: string | null) {
   if (!v) return "";
-  try { return new Date(v).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" }); } catch { return ""; }
+  try {
+    return new Date(v).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" });
+  } catch { return ""; }
 }
 function dueMeta(t: Task): { text: string; cls: string } {
   if (t.status === "done") return { text: "เสร็จสิ้น", cls: "text-emerald-600 font-semibold dark:text-emerald-300" };
@@ -164,6 +206,7 @@ function dueMeta(t: Task): { text: string; cls: string } {
   return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold dark:text-red-300" };
 }
 
+/** ===== tag chip styles (CAL1/CAL2 เด่นเป็นพิเศษ) ===== */
 function tagClass(tag: string) {
   const t = tag.toUpperCase();
   if (t === "CAL1") return "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800/60";
@@ -173,7 +216,7 @@ function tagClass(tag: string) {
 
 /** ========= Page ========= */
 export default function KanbanPage() {
-  // Theme
+  // ===== Theme state (shared with other pages) =====
   const [isDark, setIsDark] = useState(false);
   const applyTheme = (dark: boolean) => {
     const root = document.documentElement;
@@ -183,13 +226,17 @@ export default function KanbanPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(THEME_KEY);
-      if (saved === "dark" || saved === "light") { setIsDark(saved === "dark"); applyTheme(saved === "dark"); }
-      else { const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false; setIsDark(prefersDark); applyTheme(prefersDark); }
+      if (saved === "dark" || saved === "light") {
+        setIsDark(saved === "dark"); applyTheme(saved === "dark");
+      } else {
+        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+        setIsDark(prefersDark); applyTheme(prefersDark);
+      }
     } catch { setIsDark(false); applyTheme(false); }
   }, []);
   const toggleTheme = () => setIsDark((d) => (applyTheme(!d), !d));
 
-  // Data
+  // shared state
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
   const [q, setQ] = useState("");
@@ -200,16 +247,16 @@ export default function KanbanPage() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [progressDraft, setProgressDraft] = useState<number>(0);
 
-  // calendar form (โหมด B)
-  const [calEmail, setCalEmail] = useState("");     // ← อีเมลปลายทาง (บังคับ)
+  // calendar template fields
+  const [calEmail, setCalEmail] = useState("");
   const [calTitle, setCalTitle] = useState("");
   const [calDesc, setCalDesc] = useState("");
   const [calLocation, setCalLocation] = useState("");
-  const [calDate, setCalDate] = useState("");
+  const [calDate, setCalDate] = useState(""); // yyyy-mm-dd
   const [calStart, setCalStart] = useState("09:00");
   const [calEnd, setCalEnd] = useState("10:00");
 
-  // init: URL -> localStorage -> LIFF
+  /** ===== init: URL -> localStorage -> LIFF context ===== */
   useEffect(() => {
     (async () => {
       const url = new URL(window.location.href);
@@ -217,9 +264,11 @@ export default function KanbanPage() {
       const qsKey = url.searchParams.get("key");
       if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
       if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
+
       if (!qsGid) { const v = readFirst(GID_KEYS); if (v) setGroupId(v); }
       if (!qsKey) { const v = readFirst(KEY_KEYS); if (v) setAdminKey(v); }
 
+      // LIFF (ถ้าเปิดใน LINE)
       try {
         const liff: any = (window as any).liff;
         if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
@@ -232,6 +281,7 @@ export default function KanbanPage() {
     })();
   }, []);
 
+  /** ===== load data ===== */
   async function load() {
     if (!groupId || !adminKey) return;
     setLoading(true);
@@ -251,6 +301,7 @@ export default function KanbanPage() {
   }
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [groupId, adminKey]);
 
+  /** ===== columns (filter + sort) ===== */
   const columns = useMemo(() => {
     const map: Record<Status, Task[]> = { todo: [], in_progress: [], blocked: [], done: [], cancelled: [] };
     const kw = q.trim().toLowerCase();
@@ -278,13 +329,17 @@ export default function KanbanPage() {
     return map;
   }, [data, q]);
 
+  /** ===== drag & drop ===== */
   const [draggingId, setDraggingId] = useState<string | null>(null);
   function onDragStart(e: React.DragEvent, id: string) {
     setDraggingId(id);
     e.dataTransfer.setData("text/plain", id);
     e.dataTransfer.effectAllowed = "move";
   }
-  function onDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
   async function onDrop(e: React.DragEvent, next: Status) {
     e.preventDefault();
     const raw = e.dataTransfer.getData("text/plain");
@@ -298,6 +353,7 @@ export default function KanbanPage() {
 
     try {
       setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: next, progress: newProgress } : t)));
+
       const body: Partial<Pick<Task, "status" | "progress">> = next === "done" ? { status: next, progress: 100 } : { status: next };
       const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
         method: "PATCH",
@@ -314,6 +370,7 @@ export default function KanbanPage() {
     }
   }
 
+  /** ===== open/close editor ===== */
   function openEditor(t: Task) {
     setEditTask(t);
     setProgressDraft(Math.max(0, Math.min(100, Number(t.progress ?? 0))));
@@ -331,7 +388,6 @@ export default function KanbanPage() {
     }
   }
   function closeEditor() { setEditTask(null); }
-
   async function saveProgress() {
     if (!editTask) return;
     const id = editTask.id;
@@ -350,6 +406,7 @@ export default function KanbanPage() {
     }
   }
 
+  /** ===== Mark Done (Close Progress) ===== */
   async function markDone() {
     if (!editTask) return;
     const id = editTask.id;
@@ -367,41 +424,30 @@ export default function KanbanPage() {
     }
   }
 
-  /** ===== โหมด B: ใช้อีเมลที่กรอกเป็นปลายทาง (calendarId) ===== */
+  /** ===== Add to Calendar (server) ===== */
   async function addToCalendarServer() {
     const t = editTask;
     if (!t) return;
     if (!calDate) { alert("กรุณาเลือกวันที่สำหรับลงตาราง"); return; }
-    const email = calEmail.trim();
-    if (!email) { alert("กรุณากรอกอีเมลปฏิทิน (ปลายทาง)"); return; }
-
     const body = {
       title: calTitle || t.title,
       description: calDesc || t.description || "",
       location: calLocation || "",
-      date: calDate,
-      start: calStart,
-      end: calEnd,
-      attendeeEmail: email, // ✅ server จะใช้เมลนี้เป็น calendarId ปลายทาง (ไม่ใช่ attendees)
+      date: calDate, start: calStart, end: calEnd,
+      attendeeEmail: (calEmail || undefined) as string | undefined,
     };
-
     try {
-      const r = await fetch("/api/calendar/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const txt = await r.text();
-      let j: any = {};
-      try { j = JSON.parse(txt); } catch {}
-      if (!r.ok) { alert(j?.error || txt || "ลงตารางไม่สำเร็จ"); return; }
+      const r = await fetch("/api/calendar/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
       alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
     } catch (e: any) {
-      alert("ลงตารางไม่สำเร็จ");
       console.error("ADD_CAL_ERR", e?.message || e);
+      alert("ลงตารางไม่สำเร็จ — ตรวจสิทธิ์แชร์ปฏิทิน, CALENDAR_ID, และ ENV อีกครั้ง");
     }
   }
 
+  /** ========= Render ========= */
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 dark:text-slate-100">
       {/* Header */}
@@ -413,7 +459,10 @@ export default function KanbanPage() {
             <a className="text-slate-900 dark:text-white border-b-2 border-emerald-500" href="/liff/kanban">Kanban</a>
             <a className="hover:text-slate-900 dark:hover:text-white" href="/liff/dashboard">Dashboard</a>
           </nav>
+
+          {/* Animated Theme Toggle */}
           <div className="ml-2"><ThemeToggle isDark={isDark} onToggle={toggleTheme} /></div>
+
           <button
             className={btn("primary") + " md:hidden ml-auto"}
             onClick={() => {
@@ -512,6 +561,7 @@ export default function KanbanPage() {
                       className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 min-w-0"
                       title={t.title}
                     >
+                      {/* header: title + tags */}
                       <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-slate-800 dark:text-slate-100 line-clamp-1">{t.title}</div>
@@ -519,6 +569,8 @@ export default function KanbanPage() {
                             <div className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-1">{t.description}</div>
                           )}
                         </div>
+
+                        {/* tag chips */}
                         <div className="shrink-0 flex items-center gap-1">
                           {shown.map((tag, i) => (
                             <span key={i} className={cls("text-[10px] rounded px-2 py-0.5", tagClass(tag))} title={tag}>
@@ -533,6 +585,7 @@ export default function KanbanPage() {
                         </div>
                       </div>
 
+                      {/* meta */}
                       <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
                         <div className="flex items-center gap-2">
                           <span className={cls("rounded-full px-2 py-0.5", PR_CHIP[t.priority])}>{t.priority}</span>
@@ -544,6 +597,7 @@ export default function KanbanPage() {
                         </div>
                       </div>
 
+                      {/* progress bar */}
                       <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                         <div
                           className={cls("h-full rounded-full bg-gradient-to-r", PROGRESS_BAR[t.status])}
@@ -579,7 +633,10 @@ export default function KanbanPage() {
             {/* Progress */}
             <div className="mt-4">
               <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ปรับความคืบหน้า</div>
-              <input type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))} className="w-full accent-emerald-600" />
+              <input
+                type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))}
+                className="w-full accent-emerald-600"
+              />
               <div className="mt-2 flex items-center justify-between text-sm">
                 <div className="text-slate-700 dark:text-slate-200">{progressDraft}%</div>
                 <input
@@ -590,21 +647,16 @@ export default function KanbanPage() {
               </div>
             </div>
 
-            {/* Add to Calendar (โหมด B) */}
+            {/* Add to Calendar */}
             <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
-              <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar — โหมด B)</div>
+              <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar)</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
-                  <label className="text-xs text-slate-600 dark:text-slate-300">อีเมลปฏิทิน (ปลายทาง) — *บังคับ</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-300">อีเมลปฏิทิน (เชิญเข้าร่วม)</label>
                   <input
                     className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    placeholder="name@example.com"
-                    value={calEmail}
-                    onChange={(e) => setCalEmail(e.target.value)}
+                    placeholder="name@example.com" value={calEmail} onChange={(e) => setCalEmail(e.target.value)}
                   />
-                  <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    ระบบจะสร้างอีเวนต์ลงปฏิทินของอีเมลนี้โดยตรง (ต้องให้ SA มีสิทธิ์เขียน หรือใช้ Domain-wide Delegation)
-                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-600 dark:text-slate-300">ชื่อเหตุการณ์</label>
@@ -647,18 +699,29 @@ export default function KanbanPage() {
                     />
                   </div>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-600 dark:text-slate-300">สถานที่ (ถ้ามี)</label>
+                  <input
+                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    placeholder="ห้องประชุม / ลิงก์ประชุม ฯลฯ" value={calLocation} onChange={(e) => setCalLocation(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-end gap-2">
-                <button onClick={saveProgress} className={btn("ghost")}>บันทึกความคืบหน้า</button>
-                <button onClick={addToCalendarServer} className={btn("primary")}>เพิ่มใน Google Calendar</button>
+              <div className="mt-2 overflow-x-auto">
+                <div className="min-w-max w-full inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                  <button onClick={saveProgress} className={btn("primary")}>บันทึกความคืบหน้า</button>
+                  <button onClick={addToCalendarServer} className={btn("primary")}>เพิ่มใน Google Calendar</button>
+                </div>
               </div>
 
               <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                * โหมด B: ไม่ส่งคำเชิญผู้เข้าร่วม (attendees) — ระบบเขียนลงปฏิทินของอีเมลที่กรอกโดยตรง
+                * ระบบจะเปิดหน้า Google Calendar พร้อมกรอกข้อมูลให้ และเชิญอีเมลที่ระบุเป็นผู้เข้าร่วม
+                หากต้องการให้บันทึกลง “ปฏิทินของอีเมลนั้นโดยอัตโนมัติ” ต้องทำ OAuth ฝั่งเซิร์ฟเวอร์เพิ่มเติม
               </div>
             </div>
 
+            {/* Footer actions (ตัวอย่าง: ปิดงาน) */}
             <div className="mt-4 flex items-center justify-between">
               <button onClick={markDone} className={btn("primary")}>ทำเสร็จ (100%)</button>
               <button onClick={closeEditor} className={btn("ghost")}>ปิด</button>
