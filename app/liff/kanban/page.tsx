@@ -11,37 +11,31 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
       onClick={onToggle}
       aria-label="Toggle dark mode"
       className={[
-        "relative h-8 w-16 rounded-full border overflow-hidden", // 32×64
+        "relative h-8 w-16 rounded-full border overflow-hidden",
         "transition-colors duration-500 ease-out",
         "border-slate-300 dark:border-slate-600",
         bgClass,
         "shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500",
       ].join(" ")}
     >
-      {/* Day layer */}
       <div className={["absolute inset-0 transition-opacity duration-500", isDark ? "opacity-0" : "opacity-100"].join(" ")}>
         <span className="cloud cloud-1" />
         <span className="cloud cloud-2" />
       </div>
-
-      {/* Night layer */}
       <div className={["absolute inset-0 bg-slate-900 transition-opacity duration-500", isDark ? "opacity-100" : "opacity-0"].join(" ")}>
         {Array.from({ length: 12 }).map((_, i) => (
           <span key={i} className={`star star-${(i % 8) + 1}`} />
         ))}
       </div>
-
-      {/* Knob (sun/moon) */}
       <div
         className={[
-          "absolute top-1 left-1 h-6 w-6 rounded-full", // 24px
+          "absolute top-1 left-1 h-6 w-6 rounded-full",
           "transition-transform duration-500 ease-out",
-          isDark ? "translate-x-[32px]" : "translate-x-0", // 64 - 24 - 8 = 32
+          isDark ? "translate-x-[32px]" : "translate-x-0",
           "bg-yellow-300 dark:bg-slate-100 shadow-md",
           "flex items-center justify-center",
         ].join(" ")}
       >
-        {/* Sun */}
         <svg className={["h-5 w-5 transition-opacity duration-300", isDark ? "opacity-0" : "opacity-100"].join(" ")} viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="4.2" className="fill-yellow-400" />
           <g className="stroke-yellow-400" strokeWidth="1.4" strokeLinecap="round">
@@ -51,62 +45,33 @@ function ThemeToggle({ isDark, onToggle }: { isDark: boolean; onToggle: () => vo
             <path d="M19.4 4.6l-1.8 1.8" /><path d="M6.4 17.6l-1.8 1.8" />
           </g>
         </svg>
-        {/* Moon */}
         <svg className={["absolute h-5 w-5 transition-opacity duration-300", isDark ? "opacity-100" : "opacity-0"].join(" ")} viewBox="0 0 24 24" fill="none">
           <path d="M16.5 12.5a7 7 0 1 1-5-9.5 6 6 0 1 0 7.7 7.7 7.1 7.1 0 0 1-2.7 1.8z" className="fill-slate-300" />
           <circle cx="10" cy="9" r="0.9" className="fill-slate-400" />
           <circle cx="12.2" cy="12.8" r="0.7" className="fill-slate-400" />
         </svg>
       </div>
-
-      {/* local styles for clouds/stars */}
       <style jsx>{`
-        .cloud {
-          position: absolute;
-          top: 12px;
-          height: 6px;
-          width: 22px;
-          background: #fff;
-          border-radius: 999px;
-          box-shadow: 11px -5px 0 2px #fff, 22px -2px 0 0 #fff;
-          opacity: 0.85;
-          animation: cloud-move 10s linear infinite;
-        }
-        .cloud-1 { left: -16px; animation-delay: 0s; }
-        .cloud-2 { left: -32px; top: 6px; transform: scale(0.8); animation-delay: 2s; }
-        @keyframes cloud-move { 0% { transform: translateX(0); } 100% { transform: translateX(95px); } }
-
-        .star {
-          position: absolute;
-          width: 2px; height: 2px;
-          background: white; border-radius: 999px; opacity: 0.6;
-          animation: twinkle 1.6s ease-in-out infinite;
-        }
-        .star-1 { top: 6px; left: 12px; animation-delay: 0s; }
-        .star-2 { top: 5px; left: 32px; animation-delay: .2s; }
-        .star-3 { top: 16px; left: 46px; animation-delay: .4s; }
-        .star-4 { top: 22px; left: 18px; animation-delay: .6s; }
-        .star-5 { top: 10px; left: 54px; animation-delay: .8s; }
-        .star-6 { top: 26px; left: 38px; animation-delay: 1.0s; }
-        .star-7 { top: 18px; left: 6px;  animation-delay: 1.2s; }
-        .star-8 { top: 27px; left: 58px; animation-delay: 1.4s; }
-
-        @keyframes twinkle { 0%,100% { opacity: .2; transform: scale(1); } 50% { opacity: .9; transform: scale(1.35); } }
+        .cloud{position:absolute;top:12px;height:6px;width:22px;background:#fff;border-radius:999px;box-shadow:11px -5px 0 2px #fff,22px -2px 0 0 #fff;opacity:.85;animation:cloud-move 10s linear infinite}
+        .cloud-1{left:-16px;animation-delay:0s}.cloud-2{left:-32px;top:6px;transform:scale(.8);animation-delay:2s}
+        @keyframes cloud-move{0%{transform:translateX(0)}100%{transform:translateX(95px)}}
+        .star{position:absolute;width:2px;height:2px;background:white;border-radius:999px;opacity:.6;animation:twinkle 1.6s ease-in-out infinite}
+        .star-1{top:6px;left:12px;animation-delay:0s}.star-2{top:5px;left:32px;animation-delay:.2s}.star-3{top:16px;left:46px;animation-delay:.4s}
+        .star-4{top:22px;left:18px;animation-delay:.6s}.star-5{top:10px;left:54px;animation-delay:.8s}.star-6{top:26px;left:38px;animation-delay:1s}
+        .star-7{top:18px;left:6px;animation-delay:1.2s}.star-8{top:27px;left:58px;animation-delay:1.4s}
+        @keyframes twinkle{0%,100%{opacity:.2;transform:scale(1)}50%{opacity:.9;transform:scale(1.35)}}
       `}</style>
     </button>
   );
 }
 
-/** ========= Theme helpers (white/green clean) ========= */
+/** ========= Theme helpers ========= */
 const cls = (...v: Array<string | false | null | undefined>) => v.filter(Boolean).join(" ");
 const btn = (variant: "primary" | "ghost" | "danger" = "primary") =>
   ({
-    primary:
-      "px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent transition",
-    ghost:
-      "px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-emerald-400 transition dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600",
-    danger:
-      "px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
+    primary: "px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent transition",
+    ghost: "px-3 py-2 rounded-md bg-white text-slate-800 border border-slate-200 hover:border-emerald-400 transition dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600",
+    danger: "px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 border border-transparent transition",
   }[variant]);
 
 /** ========= Types ========= */
@@ -135,7 +100,6 @@ const LABEL: Record<Status, string> = {
   done: "Done",
   cancelled: "Cancelled",
 };
-
 const STATUS_BG: Record<Status, string> = {
   todo: "bg-white dark:bg-slate-900",
   in_progress: "bg-white dark:bg-slate-900",
@@ -150,7 +114,6 @@ const STATUS_RING: Record<Status, string> = {
   done: "ring-emerald-300 dark:ring-emerald-800/40",
   cancelled: "ring-slate-200 dark:ring-slate-800/40",
 };
-
 const CARD_BAR: Record<Status, string> = {
   todo: "from-emerald-400/15 to-transparent",
   in_progress: "from-emerald-500/20 to-transparent",
@@ -158,7 +121,6 @@ const CARD_BAR: Record<Status, string> = {
   done: "from-emerald-400/25 to-transparent",
   cancelled: "from-slate-400/15 to-transparent",
 };
-
 const PROGRESS_BAR: Record<Status, string> = {
   done: "from-emerald-400 to-emerald-500",
   blocked: "from-rose-400 to-rose-500",
@@ -166,7 +128,6 @@ const PROGRESS_BAR: Record<Status, string> = {
   in_progress: "from-emerald-400 to-teal-500",
   cancelled: "from-slate-300 to-slate-400",
 };
-
 const PR_CHIP: Record<Task["priority"], string> = {
   urgent: "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/60",
   high: "bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800/60",
@@ -177,7 +138,10 @@ const PR_CHIP: Record<Task["priority"], string> = {
 /** ========= Local Storage keys ========= */
 const GID_KEYS = ["taskbot_gid", "liff_group_id", "LS_GID"];
 const KEY_KEYS = ["taskbot_key", "admin_key", "ADMIN_KEY"];
-const THEME_KEY = "taskbot_theme"; // shared with LIFF page
+const THEME_KEY = "taskbot_theme";
+
+/** ✅ เก็บ/ดึง Calendar ID ไว้ใช้ครั้งต่อไป */
+const CALID_KEY = "taskbot_cal_calendarId";
 
 const readFirst = (keys: string[]): string => {
   try { for (const k of keys) { const v = localStorage.getItem(k); if (v) return v; } } catch {}
@@ -188,9 +152,7 @@ const writeAll = (keys: string[], value: string) => { try { keys.forEach((k) => 
 /** ========= Utils ========= */
 function fmtDate(v?: string | null) {
   if (!v) return "";
-  try {
-    return new Date(v).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" });
-  } catch { return ""; }
+  try { return new Date(v).toLocaleDateString("th-TH", { year: "2-digit", month: "2-digit", day: "2-digit" }); } catch { return ""; }
 }
 function dueMeta(t: Task): { text: string; cls: string } {
   if (t.status === "done") return { text: "เสร็จสิ้น", cls: "text-emerald-600 font-semibold dark:text-emerald-300" };
@@ -205,8 +167,6 @@ function dueMeta(t: Task): { text: string; cls: string } {
   if (diff === 0) return { text: "ครบกำหนดวันนี้", cls: "text-amber-600 font-semibold dark:text-amber-300" };
   return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, cls: "text-red-600 font-semibold dark:text-red-300" };
 }
-
-/** ===== tag chip styles (CAL1/CAL2 เด่นเป็นพิเศษ) ===== */
 function tagClass(tag: string) {
   const t = tag.toUpperCase();
   if (t === "CAL1") return "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800/60";
@@ -216,7 +176,7 @@ function tagClass(tag: string) {
 
 /** ========= Page ========= */
 export default function KanbanPage() {
-  // ===== Theme state (shared with other pages) =====
+  /** Theme */
   const [isDark, setIsDark] = useState(false);
   const applyTheme = (dark: boolean) => {
     const root = document.documentElement;
@@ -226,28 +186,24 @@ export default function KanbanPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(THEME_KEY);
-      if (saved === "dark" || saved === "light") {
-        setIsDark(saved === "dark"); applyTheme(saved === "dark");
-      } else {
-        const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-        setIsDark(prefersDark); applyTheme(prefersDark);
-      }
+      if (saved === "dark" || saved === "light") { setIsDark(saved === "dark"); applyTheme(saved === "dark"); }
+      else { const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false; setIsDark(prefersDark); applyTheme(prefersDark); }
     } catch { setIsDark(false); applyTheme(false); }
   }, []);
   const toggleTheme = () => setIsDark((d) => (applyTheme(!d), !d));
 
-  // shared state
+  /** shared state */
   const [groupId, setGroupId] = useState("");
   const [adminKey, setAdminKey] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Task[]>([]);
 
-  // editor
+  /** editor */
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [progressDraft, setProgressDraft] = useState<number>(0);
 
-  // calendar template fields
+  /** calendar fields */
   const [calCalendarId, setCalCalendarId] = useState("");
   const [calTitle, setCalTitle] = useState("");
   const [calDesc, setCalDesc] = useState("");
@@ -264,11 +220,12 @@ export default function KanbanPage() {
       const qsKey = url.searchParams.get("key");
       if (qsGid) { setGroupId(qsGid); writeAll(GID_KEYS, qsGid); }
       if (qsKey) { setAdminKey(qsKey); writeAll(KEY_KEYS, qsKey); }
-
       if (!qsGid) { const v = readFirst(GID_KEYS); if (v) setGroupId(v); }
       if (!qsKey) { const v = readFirst(KEY_KEYS); if (v) setAdminKey(v); }
 
-      // LIFF (ถ้าเปิดใน LINE)
+      // 🔹 โหลด Calendar ID ที่เคยกรอกไว้
+      try { const savedCalId = localStorage.getItem(CALID_KEY) || ""; setCalCalendarId(savedCalId); } catch {}
+
       try {
         const liff: any = (window as any).liff;
         if (!readFirst(GID_KEYS) && liff && process.env.NEXT_PUBLIC_LIFF_ID) {
@@ -281,40 +238,29 @@ export default function KanbanPage() {
     })();
   }, []);
 
-  /** ===== load data ===== */
+  /** load tasks */
   async function load() {
     if (!groupId || !adminKey) return;
     setLoading(true);
     try {
-      const r = await fetch(
-        `/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}${q ? `&q=${encodeURIComponent(q)}` : ""}`
-      );
+      const r = await fetch(`/api/admin/tasks?group_id=${encodeURIComponent(groupId)}&key=${encodeURIComponent(adminKey)}${q ? `&q=${encodeURIComponent(q)}` : ""}`);
       if (!r.ok) throw new Error(await r.text());
       const rows: Task[] | { items: Task[] } = await r.json();
       setData(Array.isArray(rows) ? rows : rows.items ?? []);
     } catch (e) {
       console.error(e);
       alert("โหลดงานไม่สำเร็จ ตรวจสอบ groupId หรือ adminKey");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [groupId, adminKey]);
 
-  /** ===== columns (filter + sort) ===== */
+  /** columns */
   const columns = useMemo(() => {
     const map: Record<Status, Task[]> = { todo: [], in_progress: [], blocked: [], done: [], cancelled: [] };
     const kw = q.trim().toLowerCase();
     const filtered = kw
-      ? data.filter((t) =>
-          [t.title, t.description, t.code, t.priority, ...(t.tags ?? [])]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(kw)
-        )
+      ? data.filter((t) => [t.title, t.description, t.code, t.priority, ...(t.tags ?? [])].filter(Boolean).join(" ").toLowerCase().includes(kw))
       : data;
-
     const prioWeight: Record<Task["priority"], number> = { urgent: 0, high: 1, medium: 2, low: 3 };
     filtered
       .slice()
@@ -325,27 +271,22 @@ export default function KanbanPage() {
         return prioWeight[a.priority] - prioWeight[b.priority];
       })
       .forEach((t) => map[t.status].push(t));
-
     return map;
   }, [data, q]);
 
-  /** ===== drag & drop ===== */
+  /** drag & drop */
   const [draggingId, setDraggingId] = useState<string | null>(null);
   function onDragStart(e: React.DragEvent, id: string) {
     setDraggingId(id);
     e.dataTransfer.setData("text/plain", id);
     e.dataTransfer.effectAllowed = "move";
   }
-  function onDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
+  function onDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }
   async function onDrop(e: React.DragEvent, next: Status) {
     e.preventDefault();
     const raw = e.dataTransfer.getData("text/plain");
     const id = raw || draggingId;
     if (!id) return;
-
     const current = data.find((t) => t.id === id);
     if (!current) return;
 
@@ -353,39 +294,27 @@ export default function KanbanPage() {
 
     try {
       setData((prev) => prev.map((t) => (t.id === id ? { ...t, status: next, progress: newProgress } : t)));
-
       const body: Partial<Pick<Task, "status" | "progress">> = next === "done" ? { status: next, progress: 100 } : { status: next };
       const r = await fetch(`/api/admin/tasks/${id}?key=${encodeURIComponent(adminKey)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
     } catch (e) {
       console.error(e);
       alert("อัปเดตสถานะไม่สำเร็จ");
       load();
-    } finally {
-      setDraggingId(null);
-    }
+    } finally { setDraggingId(null); }
   }
 
-  /** ===== open/close editor ===== */
+  /** open/close editor */
   function openEditor(t: Task) {
     setEditTask(t);
     setProgressDraft(Math.max(0, Math.min(100, Number(t.progress ?? 0))));
-    setCalTitle(t.title || "");
-    setCalDesc(t.description || "");
-    setCalLocation("");
+    setCalTitle(t.title || ""); setCalDesc(t.description || ""); setCalLocation("");
     if (t.due_at) {
       const d = new Date(t.due_at);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      setCalDate(`${yyyy}-${mm}-${dd}`);
-    } else {
-      setCalDate("");
-    }
+      setCalDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+    } else { setCalDate(""); }
   }
   function closeEditor() { setEditTask(null); }
   async function saveProgress() {
@@ -399,14 +328,8 @@ export default function KanbanPage() {
       });
       if (!r.ok) throw new Error(await r.text());
       closeEditor();
-    } catch (e) {
-      console.error(e);
-      alert("บันทึกเปอร์เซ็นต์ไม่สำเร็จ");
-      load();
-    }
+    } catch (e) { console.error(e); alert("บันทึกเปอร์เซ็นต์ไม่สำเร็จ"); load(); }
   }
-
-  /** ===== Mark Done (Close Progress) ===== */
   async function markDone() {
     if (!editTask) return;
     const id = editTask.id;
@@ -417,15 +340,10 @@ export default function KanbanPage() {
       });
       if (!r.ok) throw new Error(await r.text());
       closeEditor();
-    } catch (e) {
-      console.error(e);
-      alert("ปิดงานไม่สำเร็จ");
-      load();
-    }
+    } catch (e) { console.error(e); alert("ปิดงานไม่สำเร็จ"); load(); }
   }
 
-
-  /** ===== Add to Calendar (server) ===== */
+  /** Add to Calendar (server) */
   async function addToCalendarServer() {
     const t = editTask;
     if (!t) return;
@@ -433,21 +351,17 @@ export default function KanbanPage() {
     if (!calCalendarId.trim()) { alert("กรุณากรอก Calendar ID"); return; }
 
     const body = {
-      calendarId: calCalendarId.trim(),          // <- ใช้ Calendar ID ที่กำหนด
+      calendarId: calCalendarId.trim(),
       title: calTitle || t.title,
       description: calDesc || t.description || "",
       location: calLocation || "",
-      date: calDate,
-      start: calStart,
-      end: calEnd,
+      date: calDate, start: calStart, end: calEnd,
     };
 
     try {
-      const r = await fetch("/api/calendar/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      // 🔸 บันทึก Calendar ID ไว้ก่อนยิง (กันกรอกซ้ำรอบหน้า)
+      try { localStorage.setItem(CALID_KEY, body.calendarId); } catch {}
+      const r = await fetch("/api/calendar/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
       alert("ลงตารางสำเร็จ! " + (j.eventId ? `eventId=${j.eventId}` : ""));
@@ -458,7 +372,7 @@ export default function KanbanPage() {
   }
 
   /** ========= Render ========= */
- return (
+  return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-slate-900 dark:text-slate-100">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/85 dark:bg-slate-900/85 backdrop-blur border-b border-slate-200 dark:border-slate-700">
@@ -469,20 +383,17 @@ export default function KanbanPage() {
             <a className="text-slate-900 dark:text-white border-b-2 border-emerald-500" href="/liff/kanban">Kanban</a>
             <a className="hover:text-slate-900 dark:hover:text-white" href="/liff/dashboard">Dashboard</a>
           </nav>
-
-          {/* Animated Theme Toggle */}
           <div className="ml-2"><ThemeToggle isDark={isDark} onToggle={toggleTheme} /></div>
-
           <button
             className={btn("primary") + " md:hidden ml-auto"}
             onClick={() => {
-              const url = new URL("/liff", location.origin);
+              const url = new URL("/liff/dashboard", location.origin);
               if (groupId) url.searchParams.set("group_id", groupId);
               if (adminKey) url.searchParams.set("key", adminKey);
               window.open(url.toString(), "_self");
             }}
           >
-            LIFF TASK
+            Dashboard
           </button>
         </div>
       </header>
@@ -503,8 +414,7 @@ export default function KanbanPage() {
             <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">Admin Key</label>
             <input
               className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
-              type="password"
-              value={adminKey}
+              type="password" value={adminKey}
               onChange={(e) => setAdminKey(e.target.value)}
               placeholder="ADMIN_KEY"
             />
@@ -513,8 +423,7 @@ export default function KanbanPage() {
             <label className="text-sm mb-1 block text-slate-700 dark:text-slate-300">ค้นหา</label>
             <input
               className="border border-slate-200 dark:border-slate-600 px-3 py-2 rounded w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-emerald-700"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              value={q} onChange={(e) => setQ(e.target.value)}
               placeholder="คำค้น เช่น เอกสาร, @ชื่อ, tag"
             />
           </div>
@@ -524,13 +433,13 @@ export default function KanbanPage() {
           <button
             className={btn("primary")}
             onClick={() => {
-              const url = new URL("/liff", location.origin);
+              const url = new URL("/liff/dashboard", location.origin);
               if (groupId) url.searchParams.set("group_id", groupId);
               if (adminKey) url.searchParams.set("key", adminKey);
               window.open(url.toString(), "_self");
             }}
           >
-            LIFF TASK
+            Dashboard
           </button>
         </div>
 
@@ -571,16 +480,11 @@ export default function KanbanPage() {
                       className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm mb-2 cursor-pointer hover:shadow-md transition-all ring-1 ring-black/5 min-w-0"
                       title={t.title}
                     >
-                      {/* header: title + tags */}
                       <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-slate-800 dark:text-slate-100 line-clamp-1">{t.title}</div>
-                          {t.description && (
-                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-1">{t.description}</div>
-                          )}
+                          {t.description && (<div className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-1">{t.description}</div>)}
                         </div>
-
-                        {/* tag chips */}
                         <div className="shrink-0 flex items-center gap-1">
                           {shown.map((tag, i) => (
                             <span key={i} className={cls("text-[10px] rounded px-2 py-0.5", tagClass(tag))} title={tag}>
@@ -595,7 +499,6 @@ export default function KanbanPage() {
                         </div>
                       </div>
 
-                      {/* meta */}
                       <div className="flex flex-wrap items-center justify-between mt-2 text-xs gap-2">
                         <div className="flex items-center gap-2">
                           <span className={cls("rounded-full px-2 py-0.5", PR_CHIP[t.priority])}>{t.priority}</span>
@@ -607,12 +510,8 @@ export default function KanbanPage() {
                         </div>
                       </div>
 
-                      {/* progress bar */}
                       <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className={cls("h-full rounded-full bg-gradient-to-r", PROGRESS_BAR[t.status])}
-                          style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }}
-                        />
+                        <div className={cls("h-full rounded-full bg-gradient-to-r", PROGRESS_BAR[t.status])} style={{ width: `${Math.min(100, Math.max(0, Number(t.progress ?? 0)))}%` }} />
                       </div>
                     </article>
                   );
@@ -643,10 +542,7 @@ export default function KanbanPage() {
             {/* Progress */}
             <div className="mt-4">
               <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ปรับความคืบหน้า</div>
-              <input
-                type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))}
-                className="w-full accent-emerald-600"
-              />
+              <input type="range" min={0} max={100} value={progressDraft} onChange={(e) => setProgressDraft(Number(e.target.value))} className="w-full accent-emerald-600" />
               <div className="mt-2 flex items-center justify-between text-sm">
                 <div className="text-slate-700 dark:text-slate-200">{progressDraft}%</div>
                 <input
@@ -658,68 +554,47 @@ export default function KanbanPage() {
             </div>
 
             {/* Add to Calendar */}
-            <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
+            <div className="mt-6 border-top border-slate-200 dark:border-slate-700 pt-4">
               <div className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">ลงตาราง (Google Calendar)</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* ❌ เดิม: อีเมลปฏิทิน (เชิญเข้าร่วม)
-                    ✅ ใหม่: Calendar ID */}
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-600 dark:text-slate-300">Calendar ID (เช่น primary หรือ someone@domain)</label>
                   <input
                     className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     placeholder="เช่น primary หรือ your@domain.com"
                     value={calCalendarId}
-                    onChange={(e) => setCalCalendarId(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setCalCalendarId(v);
+                      try { localStorage.setItem(CALID_KEY, v); } catch {}
+                    }}
                   />
                 </div>
-
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-600 dark:text-slate-300">ชื่อเหตุการณ์</label>
-                  <input
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    value={calTitle} onChange={(e) => setCalTitle(e.target.value)}
-                  />
+                  <input className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={calTitle} onChange={(e) => setCalTitle(e.target.value)} />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-600 dark:text-slate-300">รายละเอียด</label>
-                  <textarea
-                    rows={2}
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    value={calDesc} onChange={(e) => setCalDesc(e.target.value)}
-                  />
+                  <textarea rows={2} className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={calDesc} onChange={(e) => setCalDesc(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-300">วันที่</label>
-                  <input
-                    type="date"
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    value={calDate} onChange={(e) => setCalDate(e.target.value)}
-                  />
+                  <input type="date" className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={calDate} onChange={(e) => setCalDate(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-slate-600 dark:text-slate-300">เริ่ม</label>
-                    <input
-                      type="time"
-                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      value={calStart} onChange={(e) => setCalStart(e.target.value)}
-                    />
+                    <input type="time" className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={calStart} onChange={(e) => setCalStart(e.target.value)} />
                   </div>
                   <div>
                     <label className="text-xs text-slate-600 dark:text-slate-300">สิ้นสุด</label>
-                    <input
-                      type="time"
-                      className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      value={calEnd} onChange={(e) => setCalEnd(e.target.value)}
-                    />
+                    <input type="time" className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={calEnd} onChange={(e) => setCalEnd(e.target.value)} />
                   </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-600 dark:text-slate-300">สถานที่ (ถ้ามี)</label>
-                  <input
-                    className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    placeholder="ห้องประชุม / ลิงก์ประชุม ฯลฯ" value={calLocation} onChange={(e) => setCalLocation(e.target.value)}
-                  />
+                  <input className="mt-1 w-full border border-slate-200 dark:border-slate-600 rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" placeholder="ห้องประชุม / ลิงก์ประชุม ฯลฯ" value={calLocation} onChange={(e) => setCalLocation(e.target.value)} />
                 </div>
               </div>
 
@@ -729,13 +604,11 @@ export default function KanbanPage() {
                   <button onClick={addToCalendarServer} className="px-3 py-2 rounded-md bg-emerald-600 text-white">เพิ่มใน Google Calendar</button>
                 </div>
               </div>
-
               <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                * ระบบจะใช้ Service Account บันทึก Event ลง Calendar ID ที่ระบุโดยตรง (ต้องแชร์สิทธิ์ให้ Service Account เขียนได้)
+                * ระบบจะใช้ Service Account บันทึก Event ลง Calendar ID ที่ระบุโดยตรง (อย่าลืมแชร์สิทธิ์ให้ Service Account เขียนได้)
               </div>
             </div>
 
-            {/* Footer actions */}
             <div className="mt-4 flex items-center justify-between">
               <button onClick={markDone} className="px-3 py-2 rounded-md bg-emerald-600 text-white">ทำเสร็จ (100%)</button>
               <button onClick={closeEditor} className="px-3 py-2 rounded-md bg-white border">ปิด</button>
