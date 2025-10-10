@@ -554,8 +554,13 @@ export default function LiffAdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [y, m, gridStart.getDate()]);
 
-  const keyFromDate = (d: Date) =>
-    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+// ✅ เวอร์ชันใหม่: ใช้เวลาท้องเครื่อง (Local Time)
+const keyFromDate = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
   const keyFromISO = (iso: string) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(
       new Date(iso)
